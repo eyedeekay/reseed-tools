@@ -443,6 +443,14 @@ func reseedAction(c *cli.Context) {
 			reseedP2P(c, reseeder)
 		}
 	}
+	if c.Bool("yggdrasil") {
+		log.Printf("Yggdrasil listener starting\n")
+		if tlsHost != "" && tlsCert != "" && tlsKey != "" {
+			go reseedYggdrasil(c, reseeder)
+		} else {
+			reseedYggdrasil(c, reseeder)
+		}
+	}
 	if !c.Bool("trustProxy") {
 		log.Printf("HTTPS server starting\n")
 		reseedHTTPS(c, tlsCert, tlsKey, reseeder)
@@ -522,7 +530,7 @@ func reseedYggdrasil(c *cli.Context, reseeder *reseed.ReseederImpl) {
 	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
-
+	server.YggdrasilConf = c.String("yggconfig")
 	// load a blacklist
 	blacklist := reseed.NewBlacklist()
 	server.Blacklist = blacklist
