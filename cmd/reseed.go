@@ -167,6 +167,15 @@ func NewReseedCommand() cli.Command {
 				Value: "https://acme-staging-v02.api.letsencrypt.org/directory",
 				Usage: "Use this server to issue a certificate with the ACME protocol",
 			},
+			cli.BoolFlag{
+				Name:  "yggdrasil",
+				Usage: "Listen on the the Yggdrasil network to provide an alternate reseed",
+			},
+			cli.StringFlag{
+				Name:  "yggconfig",
+				Value: "yggdrasil.conf",
+				Usage: "Path to the Yggdrasil configuration file",
+			},
 		},
 	}
 }
@@ -507,6 +516,35 @@ func makeRandomHost(port int) (host.Host, error) {
 		return nil, err
 	}
 	return host, nil
+}
+
+func reseedYggdrasil(c *cli.Context, reseeder *reseed.ReseederImpl) {
+	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
+	server.Reseeder = reseeder
+	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
+
+	// load a blacklist
+	blacklist := reseed.NewBlacklist()
+	server.Blacklist = blacklist
+	blacklistFile := c.String("blacklist")
+	if "" != blacklistFile {
+		blacklist.LoadFile(blacklistFile)
+	}
+
+	// print stats once in a while
+	if c.Duration("stats") != 0 {
+		go func() {
+			var mem runtime.MemStats
+			for range time.Tick(c.Duration("stats")) {
+				runtime.ReadMemStats(&mem)
+				log.Printf("TotalAllocs: %d Kb, Allocs: %d Kb, Mallocs: %d, NumGC: %d", mem.TotalAlloc/1024, mem.Alloc/1024, mem.Mallocs, mem.NumGC)
+			}
+		}()
+	}
+	if err := server.ListenAndServeYggdrasil(); err != nil {
+		log.Fatalln(err)
+	}
+	log.Printf("Yggdrasil listener started on %s\n", server.YggdrasilAddr())
 }
 
 func reseedP2P(c *cli.Context, reseeder *reseed.ReseederImpl) {

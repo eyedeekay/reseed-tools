@@ -5,10 +5,15 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
+	mrand "math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -17,12 +22,20 @@ import (
 	"github.com/eyedeekay/sam3"
 	"github.com/eyedeekay/sam3/i2pkeys"
 	"github.com/gorilla/handlers"
+	"github.com/hjson/hjson-go"
 	"github.com/justinas/alice"
 	"github.com/libp2p/go-libp2p-core/host"
 	gostream "github.com/libp2p/go-libp2p-gostream"
 	p2phttp "github.com/libp2p/go-libp2p-http"
+
+	"github.com/mitchellh/mapstructure"
 	throttled "github.com/throttled/throttled/v2"
 	"github.com/throttled/throttled/v2/store"
+	"github.com/yggdrasil-network/yggdrasil-go/src/config"
+	"github.com/yggdrasil-network/yggdrasil-go/src/core"
+	"github.com/yggdrasil-network/yggdrasil-go/src/defaults"
+	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
+	"golang.org/x/text/encoding/unicode"
 )
 
 const (
@@ -38,7 +51,16 @@ type Server struct {
 	Reseeder      *ReseederImpl
 	Blacklist     *Blacklist
 	OnionListener *tor.OnionService
+	YggdrasilConf string
+	yggdrasilNode *node
 	acceptables   map[string]time.Time
+}
+type node struct {
+	core      *core.Core
+	config    *config.NodeConfig
+	multicast *multicast.Multicast
+	//tuntap    *tuntap.TunAdapter
+	//admin     *admin.AdminSocket
 }
 
 func NewServer(prefix string, trustProxy bool) *Server {
@@ -172,6 +194,97 @@ func (srv *Server) ListenAndServe() error {
 	}
 
 	return srv.Serve(newBlacklistListener(ln, srv.Blacklist))
+}
+
+func (srv *Server) YggdrasilConfigFile() (*config.NodeConfig, error) {
+	var conf []byte
+	var err error
+	if srv.YggdrasilConf != "" {
+		conf, err = ioutil.ReadFile(srv.YggdrasilConf)
+	} else {
+		conf, err = ioutil.ReadAll(os.Stdin)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Equal(conf[0:2], []byte{0xFF, 0xFE}) ||
+		bytes.Equal(conf[0:2], []byte{0xFE, 0xFF}) {
+		utf := unicode.UTF16(unicode.BigEndian, unicode.UseBOM)
+		decoder := utf.NewDecoder()
+		conf, err = decoder.Bytes(conf)
+		if err != nil {
+			return nil, err
+		}
+	}
+	cfg := defaults.GenerateConfig()
+	var dat map[string]interface{}
+	if err := hjson.Unmarshal(conf, &dat); err != nil {
+		return nil, err
+	}
+	// Sanitise the config
+	confJson, err := json.Marshal(dat)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(confJson, &cfg); err != nil {
+		return nil, err
+	}
+	// Overlay our newly mapped configuration onto the autoconf node config that
+	// we generated above.
+	if err = mapstructure.Decode(dat, &cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func (srv *Server) ListenAndServeYggdrasil() error {
+	cfg, err := srv.YggdrasilConfigFile()
+	if err != nil {
+		return err
+	}
+	srv.yggdrasilNode.core = &core.Core{}
+	if err = srv.yggdrasilNode.core.Start(cfg, nil); err != nil {
+		return err
+	}
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	var interf net.Interface
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if addrs, err := iface.MulticastAddrs(); addrs == nil || err != nil {
+			continue
+		}
+		interf = iface
+	}
+	addrs, err := interf.MulticastAddrs()
+	if err != nil {
+		return err
+	}
+	addr := addrs[0].(*net.IPAddr)
+	srv.yggdrasilNode.multicast = &multicast.Multicast{}
+	srv.yggdrasilNode.multicast.Init(srv.yggdrasilNode.core, srv.yggdrasilNode.config, nil, nil)
+	// get a random port above say, 40000
+	port := 40000 + int(mrand.Int31n(10000))
+	url, err := url.Parse("tcp://" + addr.IP.String() + fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+	ln, err := srv.yggdrasilNode.core.Listen(url, "")
+	if err != nil {
+		return err
+	}
+	return srv.Serve(newBlacklistListener(ln.Listener, srv.Blacklist))
+}
+
+func (srv *Server) YggdrasilAddr() string {
+	return srv.yggdrasilNode.core.Address().String()
 }
 
 func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
