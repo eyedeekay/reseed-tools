@@ -1,0 +1,168 @@
+<html>
+  <head>
+    <title>
+      I2P Reseed Tools
+    </title>
+    <meta name="author" content="eyedeekay" />
+    <meta name="description" content="reseed-tools" />
+    <meta name="keywords" content="yggdrasil-direct" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <div id="navbar">
+      <a href="#shownav">
+        Show navigation
+      </a>
+      <div id="shownav">
+        <div id="hidenav">
+          <ul>
+            <li>
+              <a href="index.html">
+                index
+              </a>
+            </li>
+            <li>
+              <a href="CHANGELOG.html">
+                CHANGELOG
+              </a>
+            </li>
+            <li>
+              <a href="DOCKER.html">
+                DOCKER
+              </a>
+            </li>
+            <li>
+              <a href="EXAMPLES.html">
+                EXAMPLES
+              </a>
+            </li>
+          </ul>
+          <br>
+          <a href="#hidenav">
+            Hide Navigation
+          </a>
+        </div>
+      </div>
+    </div>
+    <h3>
+      Docker
+    </h3>
+    <p>
+      To make it easier to deploy reseeds, it is possible to run this software as a
+      Docker image. Because the software requires access to a network database to host
+      a reseed, you will need to mount the netDb as a volume inside your docker
+      container to provide access to it, and you will need to run it as the same user
+      and group inside the container as I2P.
+    </p>
+    <p>
+      When you run a reseed under Docker in this fashion, it will automatically
+      generate a self-signed certificate for your reseed server in a Docker volume
+      mamed reseed-keys.
+      <em>
+        Back up this directory
+      </em>
+      , if it is lost it is impossible
+      to reproduce.
+    </p>
+    <p>
+      Please note that Docker is not currently compatible with .onion reseeds unless
+      you pass the –network=host tag.
+    </p>
+    <h4>
+      If I2P is running as your user, do this:
+    </h4>
+    <pre><code>    docker run -itd \
+        --name reseed \
+        --publish 443:8443 \
+        --restart always \
+        --volume $HOME/.i2p/netDb:$HOME/.i2p/netDb:z \
+        --volume reseed-keys:/var/lib/i2p/i2p-config/reseed \
+        eyedeekay/reseed \
+            --signer $YOUR_EMAIL_HERE
+</code></pre>
+    <h4>
+      If I2P is running as another user, do this:
+    </h4>
+    <pre><code>    docker run -itd \
+        --name reseed \
+        --user $(I2P_UID) \
+        --group-add $(I2P_GID) \
+        --publish 443:8443 \
+        --restart always \
+        --volume /PATH/TO/USER/I2P/HERE/netDb:/var/lib/i2p/i2p-config/netDb:z \
+        --volume reseed-keys:/var/lib/i2p/i2p-config/reseed \
+        eyedeekay/reseed \
+            --signer $YOUR_EMAIL_HERE
+</code></pre>
+    <h4>
+      <strong>
+        Debian/Ubuntu and Docker
+      </strong>
+    </h4>
+    <p>
+      In many cases I2P will be running as the Debian system user
+      <code>
+        i2psvc
+      </code>
+      . This
+      is the case for all installs where Debian’s Advanced Packaging Tool(apt) was
+      used to peform the task. If you used
+      <code>
+        apt-get install
+      </code>
+      this command will
+      work for you. In that case, just copy-and-paste:
+    </p>
+    <pre><code>    docker run -itd \
+        --name reseed \
+        --user $(id -u i2psvc) \
+        --group-add $(id -g i2psvc) \
+        --publish 443:8443 \
+        --restart always \
+        --volume /var/lib/i2p/i2p-config/netDb:/var/lib/i2p/i2p-config/netDb:z \
+        --volume reseed-keys:/var/lib/i2p/i2p-config/reseed \
+        eyedeekay/reseed \
+            --signer $YOUR_EMAIL_HERE
+</code></pre>
+    <div>
+      <a href="#show">
+        Show license
+      </a>
+      <div id="show">
+        <div id="hide">
+          <pre><code>Copyright (c) 2014 Matt Drollette
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+</code></pre>
+          <a href="#hide">
+            Hide license
+          </a>
+        </div>
+      </div>
+    </div>
+    <div>
+      <iframe src="https://snowflake.torproject.org/embed.html" width="320" height="240" frameborder="0" scrolling="no"></iframe>
+    </div>
+    <div>
+      <a href="https://geti2p.net/">
+        I2P
+      </a>
+    </div>
+  </body>
+</html>
