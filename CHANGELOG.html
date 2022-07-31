@@ -1,0 +1,146 @@
+<html>
+  <head>
+    <title>
+      I2P Reseed Tools
+    </title>
+    <meta name="author" content="eyedeekay" />
+    <meta name="description" content="reseed-tools" />
+    <meta name="keywords" content="yggdrasil-direct" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <div id="navbar">
+      <a href="#shownav">
+        Show navigation
+      </a>
+      <div id="shownav">
+        <div id="hidenav">
+          <ul>
+            <li>
+              <a href="index.html">
+                index
+              </a>
+            </li>
+            <li>
+              <a href="CHANGELOG.html">
+                CHANGELOG
+              </a>
+            </li>
+            <li>
+              <a href="DOCKER.html">
+                DOCKER
+              </a>
+            </li>
+            <li>
+              <a href="EXAMPLES.html">
+                EXAMPLES
+              </a>
+            </li>
+          </ul>
+          <br>
+          <a href="#hidenav">
+            Hide Navigation
+          </a>
+        </div>
+      </div>
+    </div>
+    <p>
+      2021-12-16
+      * app.Version = “0.2.11”
+      * include license file in plugin
+    </p>
+    <p>
+      2021-12-14
+      * app.Version = “0.2.10”
+      * restart changelog
+      * fix websiteURL in plugin.config
+    </p>
+    <p>
+      2019-04-21
+      * app.Version = “0.1.7”
+      * enabling TLS 1.3
+      <em>
+        only
+      </em>
+    </p>
+    <p>
+      2016-12-21
+      * deactivating previous random time delta, makes only sense when patching ri too
+      * app.Version = “0.1.6”
+    </p>
+    <p>
+      2016-10-09
+      * seed the math random generator with time.Now().UnixNano()
+      * added 6h+6h random time delta at su3-age to increase anonymity
+      * app.Version = “0.1.5”
+    </p>
+    <p>
+      2016-05-15
+      * README.md updated
+      * allowed routerInfos age increased from 96 to 192 hours
+      * app.Version = “0.1.4”
+    </p>
+    <p>
+      2016-03-05
+      * app.Version = “0.1.3”
+      * CRL creation added
+    </p>
+    <p>
+      2016-01-31
+      * allowed TLS ciphers updated (hardened)
+      * TLS certificate generation: RSA 4096 –&gt; ECDSAWithSHA512 384bit secp384r1
+      * ECDHE handshake: only CurveP384 + CurveP521, default CurveP256 removed
+      * TLS certificate valid: 2y –&gt; 5y
+      * throttled.PerDay(4) –&gt; PerHour(4), to enable limited testing
+      * su3 RebuildInterval: 24h –&gt; 90h, higher anonymity for the running i2p-router
+      * numRi per su3 file: 75 –&gt; 77
+    </p>
+    <p>
+      2016-01
+      * fork from
+      <a href="https://i2pgit.org/idk/reseed-tools" rel="nofollow">
+        https://i2pgit.org/idk/reseed-tools
+      </a>
+    </p>
+    <div>
+      <a href="#show">
+        Show license
+      </a>
+      <div id="show">
+        <div id="hide">
+          <pre><code>Copyright (c) 2014 Matt Drollette
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+</code></pre>
+          <a href="#hide">
+            Hide license
+          </a>
+        </div>
+      </div>
+    </div>
+    <div>
+      <iframe src="https://snowflake.torproject.org/embed.html" width="320" height="240" frameborder="0" scrolling="no"></iframe>
+    </div>
+    <div>
+      <a href="https://geti2p.net/">
+        I2P
+      </a>
+    </div>
+  </body>
+</html>
