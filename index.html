@@ -1,73 +1,424 @@
-<!DOCTYPE html>
 <html>
-<head>
-  <title>Reseed Tools</title>
-  <link rel="stylesheet" type="text/css" href ="/style.css" />
-</head>
-<body>
-<h1 id="i2p-reseed-tools">I2P Reseed Tools</h1>
-<figure>
-<img src="content/images/reseed.png" alt="" /><figcaption>Reseed Tools Poster</figcaption>
-</figure>
-<p>This tool provides a secure and efficient reseed server for the I2P network. There are several utility commands to create, sign, and validate SU3 files. Please note that this requires at least Go version 1.13, and uses Go Modules.</p>
-<p>Standard reseeds are distributed with the I2P packages. To get your reseed included, apply on <a href="http://zzz.i2p">zzz.i2p</a>.</p>
-<h2 id="dependencies">Dependencies</h2>
-<p><code>go</code>, <code>git</code>, and optionally <code>make</code> are required to build the project. Precompiled binaries for most platforms are available at my github mirror https://github.com/eyedeekay/i2p-tools-1.</p>
-<p>In order to install the build-dependencies on Ubuntu or Debian, you may use:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="fu">sudo</span> apt-get install golang-go git make</span></code></pre></div>
-<h2 id="installation">Installation</h2>
-<p>Reseed-tools can be run as a user, as a freestanding service, or be installed as an I2P Plugin. It will attempt to configure itself automatically. You should make sure to set the <code>--signer</code> flag or the <code>RESEED_EMAIL</code> environment variable to configure your signing keys/contact info.</p>
-<h4 id="plugin-install-urls">Plugin install URL’s</h4>
-<p>Plugin releases are available inside of i2p at http://idk.i2p/reseed-tools/ and via the github mirror at https://github.com/eyedeekay/reseed-tools/releases. These can be installed by adding them on the <a href="http://127.0.0.1:7657/configplugins">http://127.0.0.1:7657/configplugins</a>.</p>
-<p>After installing the plugin, you should immediately edit the <code>$PLUGIN/signer</code> file in order to set your <code>--signer</code> email, which is used to name your keys. You can find the <code>$PLUGIN</code> directory in your I2P config directory, which is usually <code>$HOME/.i2p</code> on Unixes.</p>
-<p>This will allow the developers to contact you if your reseed has issues and will authenticate your reseed to the I2P routers that use it.</p>
-<ul>
-<li>darwin/amd64: <a href="http://idk.i2p/reseed-tools/reseed-tools-darwin-amd64.su3">http://idk.i2p/reseed-tools/reseed-tools-darwin-amd64.su3</a></li>
-<li>darwin/arm64: <a href="http://idk.i2p/reseed-tools/reseed-tools-darwin-arm64.su3">http://idk.i2p/reseed-tools/reseed-tools-darwin-arm64.su3</a></li>
-<li>linux/386: <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-386.su3">http://idk.i2p/reseed-tools/reseed-tools-linux-386.su3</a></li>
-<li>linux/amd64: <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-amd64.su3">http://idk.i2p/reseed-tools/reseed-tools-linux-amd64.su3</a></li>
-<li>linux/arm: <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-arm.su3">http://idk.i2p/reseed-tools/reseed-tools-linux-arm.su3</a></li>
-<li>linux/arm64: <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-arm64.su3">http://idk.i2p/reseed-tools/reseed-tools-linux-arm64.su3</a></li>
-<li>openbsd/amd64: <a href="http://idk.i2p/reseed-tools/reseed-tools-openbsd-amd64.su3">http://idk.i2p/reseed-tools/reseed-tools-openbsd-amd64.su3</a></li>
-<li>freebsd/386: <a href="http://idk.i2p/reseed-tools/reseed-tools-freebsd-386.su3">http://idk.i2p/reseed-tools/reseed-tools-freebsd-386.su3</a></li>
-<li>freebsd/amd64: <a href="http://idk.i2p/reseed-tools/reseed-tools-freebsd-amd64.su3">http://idk.i2p/reseed-tools/reseed-tools-freebsd-amd64.su3</a></li>
-<li>windows/amd64: <a href="http://idk.i2p/reseed-tools/reseed-tools-windows-amd64.su3">http://idk.i2p/reseed-tools/reseed-tools-windows-amd64.su3</a></li>
-<li>windows/386: <a href="http://idk.i2p/reseed-tools/reseed-tools-windows-386.su3">http://idk.i2p/reseed-tools/reseed-tools-windows-386.su3</a></li>
-</ul>
-<h3 id="installationfrom-source">Installation(From Source)</h3>
-<pre><code>git clone https://i2pgit.org/idk/reseed-tools
+  <head>
+    <title>
+      I2P Reseed Tools
+    </title>
+    <meta name="author" content="eyedeekay" />
+    <meta name="description" content="reseed-tools" />
+    <meta name="keywords" content="yggdrasil-direct" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <div id="navbar">
+      <a href="#shownav">
+        Show navigation
+      </a>
+      <div id="shownav">
+        <div id="hidenav">
+          <ul>
+            <li>
+              <a href="index.html">
+                index
+              </a>
+            </li>
+            <li>
+              <a href="CHANGELOG.html">
+                CHANGELOG
+              </a>
+            </li>
+            <li>
+              <a href="DOCKER.html">
+                DOCKER
+              </a>
+            </li>
+            <li>
+              <a href="EXAMPLES.html">
+                EXAMPLES
+              </a>
+            </li>
+          </ul>
+          <br>
+          <a href="#hidenav">
+            Hide Navigation
+          </a>
+        </div>
+      </div>
+    </div>
+    <h1>
+      <a href="/">
+        I2P Reseed Tools
+      </a>
+    </h1>
+    <p>
+      <img src="content/images/reseed.png" alt="Reseed Tools Poster"/>
+    </p>
+    <p>
+      This tool provides a secure and efficient reseed server for the I2P network.
+      There are several utility commands to create, sign, and validate SU3 files.
+      Please note that this requires at least Go version 1.13, and uses Go Modules.
+    </p>
+    <p>
+      Standard reseeds are distributed with the I2P packages. To get your reseed
+      included, apply on
+      <a href="http://zzz.i2p" rel="nofollow">
+        zzz.i2p
+      </a>
+      .
+    </p>
+    <h2>
+      Dependencies
+    </h2>
+    <p>
+      <code>
+        go
+      </code>
+      ,
+      <code>
+        git
+      </code>
+      , and optionally
+      <code>
+        make
+      </code>
+      are required to build the project.
+      Precompiled binaries for most platforms are available at my github mirror
+      <a href="https://github.com/eyedeekay/i2p-tools-1" rel="nofollow">
+        https://github.com/eyedeekay/i2p-tools-1
+      </a>
+      .
+    </p>
+    <p>
+      In order to install the build-dependencies on Ubuntu or Debian, you may use:
+    </p>
+    <pre><code>sudo apt-get install golang-go git make
+</code></pre>
+    <h2>
+      Installation
+    </h2>
+    <p>
+      Reseed-tools can be run as a user, as a freestanding service, or be installed
+      as an I2P Plugin. It will attempt to configure itself automatically. You should
+      make sure to set the
+      <code>
+        --signer
+      </code>
+      flag or the
+      <code>
+        RESEED_EMAIL
+      </code>
+      environment variable
+      to configure your signing keys/contact info.
+    </p>
+    <h4>
+      Plugin install URL’s
+    </h4>
+    <p>
+      Plugin releases are available inside of i2p at
+      <a href="http://idk.i2p/reseed-tools/" rel="nofollow">
+        http://idk.i2p/reseed-tools/
+      </a>
+      and via the github mirror at
+      <a href="https://github.com/eyedeekay/reseed-tools/releases" rel="nofollow">
+        https://github.com/eyedeekay/reseed-tools/releases
+      </a>
+      .
+      These can be installed by adding them on the
+      <a href="http://127.0.0.1:7657/configplugins" rel="nofollow">
+        http://127.0.0.1:7657/configplugins
+      </a>
+      .
+    </p>
+    <p>
+      After installing the plugin, you should immediately edit the
+      <code>
+        $PLUGIN/signer
+      </code>
+      file in order to set your
+      <code>
+        --signer
+      </code>
+      email, which is used to name your keys.
+      You can find the
+      <code>
+        $PLUGIN
+      </code>
+      directory in your I2P config directory, which is
+      usually
+      <code>
+        $HOME/.i2p
+      </code>
+      on Unixes.
+    </p>
+    <p>
+      This will allow the developers to contact you if your reseed has issues
+      and will authenticate your reseed to the I2P routers that use it.
+    </p>
+    <ul>
+      <li>
+        darwin/amd64:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-darwin-amd64.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-darwin-amd64.su3
+        </a>
+      </li>
+      <li>
+        darwin/arm64:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-darwin-arm64.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-darwin-arm64.su3
+        </a>
+      </li>
+      <li>
+        linux/386:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-386.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-linux-386.su3
+        </a>
+      </li>
+      <li>
+        linux/amd64:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-amd64.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-linux-amd64.su3
+        </a>
+      </li>
+      <li>
+        linux/arm:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-arm.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-linux-arm.su3
+        </a>
+      </li>
+      <li>
+        linux/arm64:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-linux-arm64.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-linux-arm64.su3
+        </a>
+      </li>
+      <li>
+        openbsd/amd64:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-openbsd-amd64.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-openbsd-amd64.su3
+        </a>
+      </li>
+      <li>
+        freebsd/386:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-freebsd-386.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-freebsd-386.su3
+        </a>
+      </li>
+      <li>
+        freebsd/amd64:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-freebsd-amd64.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-freebsd-amd64.su3
+        </a>
+      </li>
+      <li>
+        windows/amd64:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-windows-amd64.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-windows-amd64.su3
+        </a>
+      </li>
+      <li>
+        windows/386:
+        <a href="http://idk.i2p/reseed-tools/reseed-tools-windows-386.su3" rel="nofollow">
+          http://idk.i2p/reseed-tools/reseed-tools-windows-386.su3
+        </a>
+      </li>
+    </ul>
+    <h3>
+      Installation(From Source)
+    </h3>
+    <pre><code>git clone https://i2pgit.org/idk/reseed-tools
 cd reseed-tools
 make build
 # Optionally, if you want to install to /usr/bin/reseed-tools
-sudo make install</code></pre>
-<h2 id="usage">Usage</h2>
-<h4 id="debianubuntu-note">Debian/Ubuntu note:</h4>
-<p>Debian users who are running I2P as a system service must also run the <code>reseed-tools</code> as the same user. This is so that the reseed-tools can access the I2P service’s netDb directory. On Debian and Ubuntu, that user is <code>i2psvc</code> and the netDb directory is: <code>/var/lib/i2p/i2p-config/netDb</code>.</p>
-<h5 id="systemd-service">Systemd Service</h5>
-<p>A systemd service is provided which should work with the I2P Debian package when reseed-tools is installed in <code>/usr/bin/reseed-tools</code>. If you install with <code>make install</code> this service is also installed. This service will cause the bundles to regenerate every 12 hours.</p>
-<p>The contact email for your reseed should be added in: <code>/etc/systemd/system/reseed.d/reseed.conf</code>.</p>
-<p>Self-signed certificates will be auto-generated for these services. To change this you should edit the <code>/etc/systemd/system/reseed.d/reseed.service</code>.</p>
-<ul>
-<li>To enable starting the reseed service automatically with the system: <code>sudo systemctl enable reseed.service</code></li>
-<li>To run the service manually: <code>sudo sysctl start reseed.service</code><br />
-</li>
-<li>To reload the systemd services: <code>sudo systemctl daemon-reload</code></li>
-<li>To view the status/logs: <code>sudo journalctl -u reseed.service</code></li>
-</ul>
-<h5 id="sysv-service">SysV Service</h5>
-<p>An initscript is also provided. The initscript, unlike the systemd service, cannot schedule itself to restart. You should restart the service roughly once a day to ensure that the information does not expire.</p>
-<p>The contact email for your reseed should be added in: <code>/etc/init.d/reseed</code>.</p>
-<p>Self-signed certificates will be auto-generated for these services. To change this you should edit the <code>/etc/init.d/reseed</code>.</p>
-<h2 id="example-commands">Example Commands:</h2>
-<h3 id="without-a-webserver-standalone-with-tls-support">Without a webserver, standalone with TLS support</h3>
-<p>If this is your first time running a reseed server (ie. you don’t have any existing keys), you can simply run the command and follow the prompts to create the appropriate keys, crl and certificates. Afterwards an HTTPS reseed server will start on the default port and generate 6 files in your current directory (a TLS key, certificate and crl, and a su3-file signing key, certificate and crl).</p>
-<pre><code>reseed-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --tlsHost=your-domain.tld</code></pre>
-<h3 id="locally-behind-a-webserver-reverse-proxy-setup-preferred">Locally behind a webserver (reverse proxy setup), preferred:</h3>
-<p>If you are using a reverse proxy server it may provide the TLS certificate instead.</p>
-<pre><code>reseed-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --port=8443 --ip=127.0.0.1 --trustProxy</code></pre>
-<ul>
-<li><strong>Usage</strong> <a href="EXAMPLES.md">More examples can be found here.</a></li>
-<li><strong>Docker</strong> <a href="DOCKER.md">Docker examples can be found here</a></li>
-</ul>
-</body>
+sudo make install
+</code></pre>
+    <h2>
+      Usage
+    </h2>
+    <h4>
+      Debian/Ubuntu note:
+    </h4>
+    <p>
+      Debian users who are running I2P as a system service must also run the
+      <code>
+        reseed-tools
+      </code>
+      as the same user. This is so that the reseed-tools can access
+      the I2P service’s netDb directory. On Debian and Ubuntu, that user is
+      <code>
+        i2psvc
+      </code>
+      and the netDb directory is:
+      <code>
+        /var/lib/i2p/i2p-config/netDb
+      </code>
+      .
+    </p>
+    <h5>
+      Service Integration
+    </h5>
+    <p>
+      Support for running as a system service as part of the reseed package
+      is new. PR’s that improve integration are welcome.
+    </p>
+    <h6>
+      Systemd Service
+    </h6>
+    <p>
+      A systemd service is provided which should work with the I2P Debian package
+      when reseed-tools is installed in
+      <code>
+        /usr/bin/reseed-tools
+      </code>
+      . If you install with
+      <code>
+        make install
+      </code>
+      this service is also installed. This service will cause the
+      bundles to regenerate every 12 hours.
+    </p>
+    <p>
+      The contact email for your reseed should be added in:
+      <code>
+        /etc/systemd/system/reseed.d/reseed.conf
+      </code>
+      .
+    </p>
+    <p>
+      Self-signed certificates will be auto-generated for these services. To change
+      this you should edit the
+      <code>
+        /etc/systemd/system/reseed.d/reseed.service
+      </code>
+      .
+    </p>
+    <ul>
+      <li>
+        To enable starting the reseed service automatically with the system:
+        <code>
+          sudo systemctl enable reseed.service
+        </code>
+      </li>
+      <li>
+        To run the service manually:
+        <code>
+          sudo sysctl start reseed.service
+        </code>
+        <br/>
+      </li>
+      <li>
+        To reload the systemd services:
+        <code>
+          sudo systemctl daemon-reload
+        </code>
+      </li>
+      <li>
+        To view the status/logs:
+        <code>
+          sudo journalctl -u reseed.service
+        </code>
+      </li>
+    </ul>
+    <h6>
+      SysV Service
+    </h6>
+    <p>
+      An initscript is also provided. The initscript, unlike the systemd service,
+      cannot schedule itself to restart. You should restart the service roughly once
+      a day to ensure that the information does not expire.
+    </p>
+    <p>
+      The contact email for your reseed should be added in:
+      <code>
+        /etc/init.d/reseed
+      </code>
+      .
+    </p>
+    <p>
+      Self-signed certificates will be auto-generated for these services. To change
+      this you should edit the
+      <code>
+        /etc/init.d/reseed
+      </code>
+      .
+    </p>
+    <h2>
+      Example Commands:
+    </h2>
+    <h3>
+      Without a webserver, standalone with TLS support
+    </h3>
+    <p>
+      If this is your first time running a reseed server (ie. you don’t have any existing keys),
+      you can simply run the command and follow the prompts to create the appropriate keys, crl and certificates.
+      Afterwards an HTTPS reseed server will start on the default port and generate 6 files in your current directory
+      (a TLS key, certificate and crl, and a su3-file signing key, certificate and crl).
+    </p>
+    <pre><code>reseed-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --tlsHost=your-domain.tld
+</code></pre>
+    <h3>
+      Locally behind a webserver (reverse proxy setup), preferred:
+    </h3>
+    <p>
+      If you are using a reverse proxy server it may provide the TLS certificate instead.
+    </p>
+    <pre><code>reseed-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --port=8443 --ip=127.0.0.1 --trustProxy
+</code></pre>
+    <ul>
+      <li>
+        <strong>
+          Usage
+        </strong>
+        <a href="EXAMPLES.md" rel="nofollow">
+          More examples can be found here.
+        </a>
+      </li>
+      <li>
+        <strong>
+          Docker
+        </strong>
+        <a href="DOCKER.md" rel="nofollow">
+          Docker examples can be found here
+        </a>
+      </li>
+    </ul>
+    <div>
+      <a href="#show">
+        Show license
+      </a>
+      <div id="show">
+        <div id="hide">
+          <pre><code>Copyright (c) 2014 Matt Drollette
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+</code></pre>
+          <a href="#hide">
+            Hide license
+          </a>
+        </div>
+      </div>
+    </div>
+    <div>
+      <iframe src="https://snowflake.torproject.org/embed.html" width="320" height="240" frameborder="0" scrolling="no"></iframe>
+    </div>
+    <div>
+      <a href="https://geti2p.net/">
+        I2P
+      </a>
+    </div>
+  </body>
 </html>
