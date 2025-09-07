@@ -137,43 +137,76 @@ func shareAction(c *cli.Context) error {
 // information files into a compressed tar format for efficient network transfer.
 func walker(netDbDir string) (*bytes.Buffer, error) {
 	var buf bytes.Buffer
-	// Create tar writer for archive creation
 	tw := tar.NewWriter(&buf)
+
 	walkFn := func(path string, info os.FileInfo, err error) error {
-		// Handle filesystem errors during directory traversal
 		if err != nil {
 			return err
 		}
-		// Skip directories, only process regular files
-		if info.Mode().IsDir() {
+
+		if shouldSkipFile(info, netDbDir, path) {
 			return nil
 		}
-		// Calculate relative path within netDb directory
-		new_path := path[len(netDbDir):]
-		if len(new_path) == 0 {
-			return nil
-		}
-		// Open file for reading into tar archive
-		fr, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer fr.Close()
-		if h, err := tar.FileInfoHeader(info, new_path); err != nil {
-			lgr.WithError(err).Fatal("Fatal error in share")
-		} else {
-			h.Name = new_path
-			if err = tw.WriteHeader(h); err != nil {
-				lgr.WithError(err).Fatal("Fatal error in share")
-			}
-		}
-		if _, err := io.Copy(tw, fr); err != nil {
-			lgr.WithError(err).Fatal("Fatal error in share")
-		}
-		return nil
+
+		return processFileForArchive(tw, netDbDir, path, info)
 	}
+
 	if err := filepath.Walk(netDbDir, walkFn); err != nil {
 		return nil, err
 	}
 	return &buf, nil
+}
+
+// shouldSkipFile determines if a file should be excluded from the tar archive.
+// It skips directories and files with empty relative paths within the netDb directory.
+func shouldSkipFile(info os.FileInfo, netDbDir, path string) bool {
+	if info.Mode().IsDir() {
+		return true
+	}
+
+	relativePath := calculateRelativePath(netDbDir, path)
+	return len(relativePath) == 0
+}
+
+// calculateRelativePath computes the relative path of a file within the netDb directory.
+// This ensures proper archive structure by removing the base directory prefix.
+func calculateRelativePath(netDbDir, path string) string {
+	return path[len(netDbDir):]
+}
+
+// processFileForArchive handles the complete process of adding a single file to the tar archive.
+// It opens the file, creates tar headers, and copies content while handling all error cases.
+func processFileForArchive(tw *tar.Writer, netDbDir, path string, info os.FileInfo) error {
+	relativePath := calculateRelativePath(netDbDir, path)
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return addFileToArchive(tw, file, info, relativePath)
+}
+
+// addFileToArchive creates tar header and copies file content to the archive.
+// It handles tar header creation and validates successful writes to the archive.
+func addFileToArchive(tw *tar.Writer, file *os.File, info os.FileInfo, relativePath string) error {
+	header, err := tar.FileInfoHeader(info, relativePath)
+	if err != nil {
+		lgr.WithError(err).Fatal("Fatal error in share")
+		return err
+	}
+
+	header.Name = relativePath
+	if err = tw.WriteHeader(header); err != nil {
+		lgr.WithError(err).Fatal("Fatal error in share")
+		return err
+	}
+
+	if _, err := io.Copy(tw, file); err != nil {
+		lgr.WithError(err).Fatal("Fatal error in share")
+		return err
+	}
+
+	return nil
 }
