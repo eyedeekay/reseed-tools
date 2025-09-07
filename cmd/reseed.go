@@ -449,7 +449,7 @@ func setupI2PKeys(c *cli.Context, tlsConfig *tlsConfiguration) (i2pkeys.I2PKeys,
 	}
 
 	configureI2PTLSSettings(tlsConfig, i2pkey)
-	
+
 	if err := setupI2PTLSCertificate(c, tlsConfig); err != nil {
 		lgr.WithError(err).Fatal("Fatal error")
 	}
