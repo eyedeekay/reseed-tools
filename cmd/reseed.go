@@ -662,7 +662,8 @@ func reseedHTTPWithContext(ctx context.Context, c *cli.Context, reseeder *reseed
 	return server.ListenAndServe()
 }
 
-func reseedOnionWithContext(ctx context.Context, c *cli.Context, onionTlsCert, onionTlsKey string, reseeder *reseed.ReseederImpl) error {
+// setupOnionServer configures a new reseed server instance with blacklist support.
+func setupOnionServer(c *cli.Context, reseeder *reseed.ReseederImpl) *reseed.Server {
 	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
@@ -675,65 +676,82 @@ func reseedOnionWithContext(ctx context.Context, c *cli.Context, onionTlsCert, o
 		blacklist.LoadFile(blacklistFile)
 	}
 
-	// print stats once in a while
-	if c.Duration("stats") != 0 {
-		go func() {
-			var mem runtime.MemStats
-			ticker := time.NewTicker(c.Duration("stats"))
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					runtime.ReadMemStats(&mem)
-					lgr.WithField("total_allocs_kb", mem.TotalAlloc/1024).WithField("allocs_kb", mem.Alloc/1024).WithField("mallocs", mem.Mallocs).WithField("num_gc", mem.NumGC).Debug("Memory stats")
-				}
-			}
-		}()
+	return server
+}
+
+// startStatsMonitoring begins memory statistics monitoring in a separate goroutine.
+func startStatsMonitoring(ctx context.Context, c *cli.Context) {
+	if c.Duration("stats") == 0 {
+		return
 	}
 
+	go func() {
+		var mem runtime.MemStats
+		ticker := time.NewTicker(c.Duration("stats"))
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				runtime.ReadMemStats(&mem)
+				lgr.WithField("total_allocs_kb", mem.TotalAlloc/1024).WithField("allocs_kb", mem.Alloc/1024).WithField("mallocs", mem.Mallocs).WithField("num_gc", mem.NumGC).Debug("Memory stats")
+			}
+		}
+	}()
+}
+
+// calculateOnionPort parses the port from context and increments it for onion service.
+func calculateOnionPort(c *cli.Context) (int, error) {
 	port, err := strconv.Atoi(c.String("port"))
 	if err != nil {
-		return fmt.Errorf("invalid port: %w", err)
+		return 0, fmt.Errorf("invalid port: %w", err)
 	}
-	port += 1
+	return port + 1, nil
+}
+
+// createTorListenConf creates a Tor listen configuration with the specified parameters.
+func createTorListenConf(port int, key ed25519.PrivateKey, remotePorts []int, singleOnion bool) *tor.ListenConf {
+	return &tor.ListenConf{
+		LocalPort:    port,
+		Key:          key,
+		RemotePorts:  remotePorts,
+		Version3:     true,
+		NonAnonymous: singleOnion,
+		DiscardKey:   false,
+	}
+}
+
+// handleOnionKeyBasedService manages onion service startup based on existing key file.
+func handleOnionKeyBasedService(server *reseed.Server, c *cli.Context, port int, onionTlsCert, onionTlsKey string) error {
+	ok, err := ioutil.ReadFile(c.String("onionKey"))
+	if err != nil {
+		return fmt.Errorf("failed to read onion key: %w", err)
+	}
+
+	singleOnion := c.Bool("singleOnion")
+	if onionTlsCert != "" && onionTlsKey != "" {
+		tlc := createTorListenConf(port, ed25519.PrivateKey(ok), []int{443}, singleOnion)
+		return server.ListenAndServeOnionTLS(nil, tlc, onionTlsCert, onionTlsKey)
+	} else {
+		tlc := createTorListenConf(port, ed25519.PrivateKey(ok), []int{80}, singleOnion)
+		return server.ListenAndServeOnion(nil, tlc)
+	}
+}
+
+func reseedOnionWithContext(ctx context.Context, c *cli.Context, onionTlsCert, onionTlsKey string, reseeder *reseed.ReseederImpl) error {
+	server := setupOnionServer(c, reseeder)
+	startStatsMonitoring(ctx, c)
+
+	port, err := calculateOnionPort(c)
+	if err != nil {
+		return err
+	}
 
 	if _, err := os.Stat(c.String("onionKey")); err == nil {
-		ok, err := ioutil.ReadFile(c.String("onionKey"))
-		if err != nil {
-			return fmt.Errorf("failed to read onion key: %w", err)
-		}
-
-		if onionTlsCert != "" && onionTlsKey != "" {
-			tlc := &tor.ListenConf{
-				LocalPort:    port,
-				Key:          ed25519.PrivateKey(ok),
-				RemotePorts:  []int{443},
-				Version3:     true,
-				NonAnonymous: c.Bool("singleOnion"),
-				DiscardKey:   false,
-			}
-			return server.ListenAndServeOnionTLS(nil, tlc, onionTlsCert, onionTlsKey)
-		} else {
-			tlc := &tor.ListenConf{
-				LocalPort:    port,
-				Key:          ed25519.PrivateKey(ok),
-				RemotePorts:  []int{80},
-				Version3:     true,
-				NonAnonymous: c.Bool("singleOnion"),
-				DiscardKey:   false,
-			}
-			return server.ListenAndServeOnion(nil, tlc)
-		}
+		return handleOnionKeyBasedService(server, c, port, onionTlsCert, onionTlsKey)
 	} else if os.IsNotExist(err) {
-		tlc := &tor.ListenConf{
-			LocalPort:    port,
-			RemotePorts:  []int{80},
-			Version3:     true,
-			NonAnonymous: c.Bool("singleOnion"),
-			DiscardKey:   false,
-		}
+		tlc := createTorListenConf(port, nil, []int{80}, c.Bool("singleOnion"))
 		return server.ListenAndServeOnion(nil, tlc)
 	}
 
