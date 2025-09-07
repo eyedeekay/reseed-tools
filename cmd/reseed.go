@@ -438,38 +438,57 @@ func configureTLSCertificates(c *cli.Context) (*tlsConfiguration, error) {
 func setupI2PKeys(c *cli.Context, tlsConfig *tlsConfiguration) (i2pkeys.I2PKeys, error) {
 	var i2pkey i2pkeys.I2PKeys
 
-	if c.Bool("i2p") {
-		var err error
-		i2pkey, err = LoadKeys("reseed.i2pkeys", c)
-		if err != nil {
-			lgr.WithError(err).Fatal("Fatal error")
-		}
+	if !c.Bool("i2p") {
+		return i2pkey, nil
+	}
 
-		if tlsConfig.i2pTlsHost == "" {
-			tlsConfig.i2pTlsHost = i2pkey.Addr().Base32()
-		}
+	var err error
+	i2pkey, err = LoadKeys("reseed.i2pkeys", c)
+	if err != nil {
+		lgr.WithError(err).Fatal("Fatal error")
+	}
 
-		if tlsConfig.i2pTlsHost != "" {
-			if tlsConfig.i2pTlsKey == "" {
-				tlsConfig.i2pTlsKey = tlsConfig.i2pTlsHost + ".pem"
-			}
-
-			if tlsConfig.i2pTlsCert == "" {
-				tlsConfig.i2pTlsCert = tlsConfig.i2pTlsHost + ".crt"
-			}
-
-			auto := c.Bool("yes")
-			ignore := c.Bool("trustProxy")
-			if !ignore {
-				err := checkOrNewTLSCert(tlsConfig.i2pTlsHost, &tlsConfig.i2pTlsCert, &tlsConfig.i2pTlsKey, auto)
-				if err != nil {
-					lgr.WithError(err).Fatal("Fatal error")
-				}
-			}
-		}
+	configureI2PTLSSettings(tlsConfig, i2pkey)
+	
+	if err := setupI2PTLSCertificate(c, tlsConfig); err != nil {
+		lgr.WithError(err).Fatal("Fatal error")
 	}
 
 	return i2pkey, nil
+}
+
+// configureI2PTLSSettings configures TLS host and certificate paths for I2P connections.
+// It sets default values based on the I2P key's base32 address if not already specified.
+func configureI2PTLSSettings(tlsConfig *tlsConfiguration, i2pkey i2pkeys.I2PKeys) {
+	if tlsConfig.i2pTlsHost == "" {
+		tlsConfig.i2pTlsHost = i2pkey.Addr().Base32()
+	}
+
+	if tlsConfig.i2pTlsHost != "" {
+		if tlsConfig.i2pTlsKey == "" {
+			tlsConfig.i2pTlsKey = tlsConfig.i2pTlsHost + ".pem"
+		}
+
+		if tlsConfig.i2pTlsCert == "" {
+			tlsConfig.i2pTlsCert = tlsConfig.i2pTlsHost + ".crt"
+		}
+	}
+}
+
+// setupI2PTLSCertificate ensures I2P TLS certificates are available if not using a trusted proxy.
+// It checks or creates new TLS certificates based on the configuration settings.
+func setupI2PTLSCertificate(c *cli.Context, tlsConfig *tlsConfiguration) error {
+	if tlsConfig.i2pTlsHost == "" {
+		return nil
+	}
+
+	auto := c.Bool("yes")
+	ignore := c.Bool("trustProxy")
+	if ignore {
+		return nil
+	}
+
+	return checkOrNewTLSCert(tlsConfig.i2pTlsHost, &tlsConfig.i2pTlsCert, &tlsConfig.i2pTlsKey, auto)
 }
 
 // loadOrGenerateOnionKey loads an existing onion key from file or generates a new one.
@@ -847,24 +866,33 @@ func startHTTPServer(ctx context.Context, c *cli.Context, tlsConfig *tlsConfigur
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if !c.Bool("trustProxy") {
-			lgr.WithField("service", "https").Debug("HTTPS server starting")
-			if err := reseedHTTPSWithContext(ctx, c, tlsConfig.tlsCert, tlsConfig.tlsKey, reseeder); err != nil {
-				select {
-				case errChan <- fmt.Errorf("https server error: %w", err):
-				default:
-				}
-			}
-		} else {
-			lgr.WithField("service", "http").Debug("HTTP server starting")
-			if err := reseedHTTPWithContext(ctx, c, reseeder); err != nil {
-				select {
-				case errChan <- fmt.Errorf("http server error: %w", err):
-				default:
-				}
-			}
+		err := runHTTPServerBasedOnConfig(ctx, c, tlsConfig, reseeder)
+		if err != nil {
+			sendErrorToChannel(errChan, err)
 		}
 	}()
+}
+
+// runHTTPServerBasedOnConfig determines whether to run HTTP or HTTPS server based on the trustProxy configuration.
+// It starts the appropriate server type and returns any errors that occur during startup or operation.
+func runHTTPServerBasedOnConfig(ctx context.Context, c *cli.Context, tlsConfig *tlsConfiguration, reseeder *reseed.ReseederImpl) error {
+	if !c.Bool("trustProxy") {
+		lgr.WithField("service", "https").Debug("HTTPS server starting")
+		return reseedHTTPSWithContext(ctx, c, tlsConfig.tlsCert, tlsConfig.tlsKey, reseeder)
+	} else {
+		lgr.WithField("service", "http").Debug("HTTP server starting")
+		return reseedHTTPWithContext(ctx, c, reseeder)
+	}
+}
+
+// sendErrorToChannel safely sends an error to the error channel without blocking.
+// It uses a select statement to prevent blocking if the channel is full.
+func sendErrorToChannel(errChan chan<- error, err error) {
+	formattedErr := fmt.Errorf("server error: %w", err)
+	select {
+	case errChan <- formattedErr:
+	default:
+	}
 }
 
 // setupServerContext initializes the context and error handling infrastructure for server coordination.
