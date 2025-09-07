@@ -777,45 +777,66 @@ func reseedOnionWithContext(ctx context.Context, c *cli.Context, onionTlsCert, o
 	return fmt.Errorf("onion key file error: %w", err)
 }
 
+// reseedI2PWithContext starts an I2P reseed server using the SAM interface for network connectivity.
+// It configures the server with rate limiting, blacklist filtering, and optional TLS support.
 func reseedI2PWithContext(ctx context.Context, c *cli.Context, i2pTlsCert, i2pTlsKey string, i2pIdentKey i2pkeys.I2PKeys, reseeder *reseed.ReseederImpl) error {
+	server := configureI2PReseederServer(c, reseeder)
+
+	configureServerBlacklist(server, c)
+
+	startI2PStatsMonitoring(ctx, c)
+
+	return startI2PServerListener(server, c, i2pTlsCert, i2pTlsKey, i2pIdentKey)
+}
+
+// configureI2PReseederServer creates and configures a new reseed server for I2P networking.
+// It sets up rate limiting, network address, and basic server configuration.
+func configureI2PReseederServer(c *cli.Context, reseeder *reseed.ReseederImpl) *reseed.Server {
 	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
 	server.RequestRateLimit = c.Int("ratelimit")
 	server.WebRateLimit = c.Int("ratelimitweb")
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
+	return server
+}
 
-	// load a blacklist
+// configureServerBlacklist sets up IP blacklist filtering for the server based on configuration.
+// It loads blacklist entries from a file if specified in the configuration.
+func configureServerBlacklist(server *reseed.Server, c *cli.Context) {
 	blacklist := reseed.NewBlacklist()
 	server.Blacklist = blacklist
 	blacklistFile := c.String("blacklist")
-	if "" != blacklistFile {
+	if blacklistFile != "" {
 		blacklist.LoadFile(blacklistFile)
 	}
+}
 
-	// print stats once in a while
-	if c.Duration("stats") != 0 {
-		go func() {
-			var mem runtime.MemStats
-			ticker := time.NewTicker(c.Duration("stats"))
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					runtime.ReadMemStats(&mem)
-					lgr.WithField("total_allocs_kb", mem.TotalAlloc/1024).WithField("allocs_kb", mem.Alloc/1024).WithField("mallocs", mem.Mallocs).WithField("num_gc", mem.NumGC).Debug("Memory stats")
-				}
+// startI2PStatsMonitoring launches a background goroutine to periodically log memory statistics for I2P.
+// It respects the context cancellation and runs at the interval specified in configuration.
+func startI2PStatsMonitoring(ctx context.Context, c *cli.Context) {
+	if c.Duration("stats") == 0 {
+		return
+	}
+
+	go func() {
+		var mem runtime.MemStats
+		ticker := time.NewTicker(c.Duration("stats"))
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				runtime.ReadMemStats(&mem)
+				lgr.WithField("total_allocs_kb", mem.TotalAlloc/1024).WithField("allocs_kb", mem.Alloc/1024).WithField("mallocs", mem.Mallocs).WithField("num_gc", mem.NumGC).Debug("Memory stats")
 			}
-		}()
-	}
+		}
+	}()
+}
 
-	port, err := strconv.Atoi(c.String("port"))
-	if err != nil {
-		return fmt.Errorf("invalid port: %w", err)
-	}
-	port += 1
-
+// startI2PServerListener starts the I2P server with optional TLS configuration.
+// It chooses between TLS and non-TLS server variants based on certificate availability.
+func startI2PServerListener(server *reseed.Server, c *cli.Context, i2pTlsCert, i2pTlsKey string, i2pIdentKey i2pkeys.I2PKeys) error {
 	if i2pTlsCert != "" && i2pTlsKey != "" {
 		return server.ListenAndServeI2PTLS(c.String("samaddr"), i2pIdentKey, i2pTlsCert, i2pTlsKey)
 	} else {
