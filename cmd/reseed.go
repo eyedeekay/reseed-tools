@@ -395,43 +395,68 @@ func configureTLSCertificates(c *cli.Context) (*tlsConfiguration, error) {
 	}
 
 	if config.tlsHost != "" {
-		config.onionTlsHost = config.tlsHost
-		config.i2pTlsHost = config.tlsHost
+		setupTLSHostConfiguration(config)
+		setupTLSKeyPaths(c, config)
+		setupTLSCertPaths(c, config)
 
-		config.tlsKey = c.String("tlsKey")
-		if config.tlsKey == "" {
-			config.tlsKey = config.tlsHost + ".pem"
-			config.onionTlsKey = config.tlsHost + ".pem"
-			config.i2pTlsKey = config.tlsHost + ".pem"
-		}
-
-		config.tlsCert = c.String("tlsCert")
-		if config.tlsCert == "" {
-			config.tlsCert = config.tlsHost + ".crt"
-			config.onionTlsCert = config.tlsHost + ".crt"
-			config.i2pTlsCert = config.tlsHost + ".crt"
-		}
-
-		auto := c.Bool("yes")
 		ignore := c.Bool("trustProxy")
 		if !ignore {
-			acme := c.Bool("acme")
-			if acme {
-				acmeserver := c.String("acmeserver")
-				err := checkUseAcmeCert(config.tlsHost, "", acmeserver, &config.tlsCert, &config.tlsKey, auto)
-				if err != nil {
-					lgr.WithError(err).Fatal("Fatal error")
-				}
-			} else {
-				err := checkOrNewTLSCert(config.tlsHost, &config.tlsCert, &config.tlsKey, auto)
-				if err != nil {
-					lgr.WithError(err).Fatal("Fatal error")
-				}
+			err := validateAndProvisionCertificates(c, config)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
 
 	return config, nil
+}
+
+// setupTLSHostConfiguration configures host settings for all TLS protocols.
+func setupTLSHostConfiguration(config *tlsConfiguration) {
+	config.onionTlsHost = config.tlsHost
+	config.i2pTlsHost = config.tlsHost
+}
+
+// setupTLSKeyPaths configures TLS key file paths with defaults if not specified.
+func setupTLSKeyPaths(c *cli.Context, config *tlsConfiguration) {
+	config.tlsKey = c.String("tlsKey")
+	if config.tlsKey == "" {
+		defaultKeyPath := config.tlsHost + ".pem"
+		config.tlsKey = defaultKeyPath
+		config.onionTlsKey = defaultKeyPath
+		config.i2pTlsKey = defaultKeyPath
+	}
+}
+
+// setupTLSCertPaths configures TLS certificate file paths with defaults if not specified.
+func setupTLSCertPaths(c *cli.Context, config *tlsConfiguration) {
+	config.tlsCert = c.String("tlsCert")
+	if config.tlsCert == "" {
+		defaultCertPath := config.tlsHost + ".crt"
+		config.tlsCert = defaultCertPath
+		config.onionTlsCert = defaultCertPath
+		config.i2pTlsCert = defaultCertPath
+	}
+}
+
+// validateAndProvisionCertificates handles certificate validation and generation based on configuration.
+func validateAndProvisionCertificates(c *cli.Context, config *tlsConfiguration) error {
+	auto := c.Bool("yes")
+	acme := c.Bool("acme")
+
+	if acme {
+		acmeserver := c.String("acmeserver")
+		err := checkUseAcmeCert(config.tlsHost, "", acmeserver, &config.tlsCert, &config.tlsKey, auto)
+		if err != nil {
+			lgr.WithError(err).Fatal("Fatal error")
+		}
+	} else {
+		err := checkOrNewTLSCert(config.tlsHost, &config.tlsCert, &config.tlsKey, auto)
+		if err != nil {
+			lgr.WithError(err).Fatal("Fatal error")
+		}
+	}
+	return nil
 }
 
 // setupI2PKeys configures I2P keys and TLS certificates if I2P protocol is enabled.
