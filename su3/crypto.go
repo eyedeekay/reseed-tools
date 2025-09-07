@@ -38,6 +38,22 @@ func checkSignature(c *x509.Certificate, algo x509.SignatureAlgorithm, signed, s
 		return errors.New("x509: certificate is nil")
 	}
 
+	hashType, err := mapAlgorithmToHashType(algo)
+	if err != nil {
+		return err
+	}
+
+	digest, err := computeDigest(hashType, signed)
+	if err != nil {
+		return err
+	}
+
+	return verifySignatureByKeyType(c.PublicKey, digest, signature)
+}
+
+// mapAlgorithmToHashType maps a signature algorithm to its corresponding hash function.
+// It returns the appropriate crypto.Hash type for the given x509.SignatureAlgorithm.
+func mapAlgorithmToHashType(algo x509.SignatureAlgorithm) (crypto.Hash, error) {
 	var hashType crypto.Hash
 
 	// Map signature algorithm to appropriate hash function
@@ -53,61 +69,83 @@ func checkSignature(c *x509.Certificate, algo x509.SignatureAlgorithm, signed, s
 		hashType = crypto.SHA512
 	default:
 		lgr.WithField("algorithm", algo).Error("Unsupported signature algorithm")
-		return x509.ErrUnsupportedAlgorithm
+		return 0, x509.ErrUnsupportedAlgorithm
 	}
 
+	return hashType, nil
+}
+
+// computeDigest creates a hash digest of the signed data using the specified hash type.
+// It validates hash availability and computes the digest needed for signature verification.
+func computeDigest(hashType crypto.Hash, signed []byte) ([]byte, error) {
 	if !hashType.Available() {
 		lgr.WithField("hash_type", hashType).Error("Hash type not available")
-		return x509.ErrUnsupportedAlgorithm
+		return nil, x509.ErrUnsupportedAlgorithm
 	}
+
 	h := hashType.New()
-
 	h.Write(signed)
-	digest := h.Sum(nil)
+	return h.Sum(nil), nil
+}
 
+// verifySignatureByKeyType performs signature verification based on the public key algorithm type.
+// It handles RSA, DSA, and ECDSA key types with their respective signature formats and verification procedures.
+func verifySignatureByKeyType(publicKey crypto.PublicKey, digest, signature []byte) error {
 	// Verify signature based on public key algorithm type
 	// Each algorithm has different signature formats and verification procedures
-	switch pub := c.PublicKey.(type) {
+	switch pub := publicKey.(type) {
 	case *rsa.PublicKey:
 		// the digest is already hashed, so we force a 0 here
 		return rsa.VerifyPKCS1v15(pub, 0, digest, signature)
 	case *dsa.PublicKey:
-		dsaSig := new(dsaSignature)
-		if _, err := asn1.Unmarshal(signature, dsaSig); err != nil {
-			lgr.WithError(err).Error("Failed to unmarshal DSA signature")
-			return err
-		}
-		// Validate DSA signature components are positive integers
-		// Zero or negative values indicate malformed or invalid signatures
-		if dsaSig.R.Sign() <= 0 || dsaSig.S.Sign() <= 0 {
-			lgr.WithField("r_sign", dsaSig.R.Sign()).WithField("s_sign", dsaSig.S.Sign()).Error("DSA signature contained zero or negative values")
-			return errors.New("x509: DSA signature contained zero or negative values")
-		}
-		if !dsa.Verify(pub, digest, dsaSig.R, dsaSig.S) {
-			lgr.Error("DSA signature verification failed")
-			return errors.New("x509: DSA verification failure")
-		}
-		return
+		return verifyDSASignature(pub, digest, signature)
 	case *ecdsa.PublicKey:
-		ecdsaSig := new(ecdsaSignature)
-		if _, err := asn1.Unmarshal(signature, ecdsaSig); err != nil {
-			lgr.WithError(err).Error("Failed to unmarshal ECDSA signature")
-			return err
-		}
-		// Validate ECDSA signature components are positive integers
-		// Similar validation to DSA as both use R,S component pairs
-		if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 {
-			lgr.WithField("r_sign", ecdsaSig.R.Sign()).WithField("s_sign", ecdsaSig.S.Sign()).Error("ECDSA signature contained zero or negative values")
-			return errors.New("x509: ECDSA signature contained zero or negative values")
-		}
-		if !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
-			lgr.Error("ECDSA signature verification failed")
-			return errors.New("x509: ECDSA verification failure")
-		}
-		return
+		return verifyECDSASignature(pub, digest, signature)
 	}
-	lgr.WithField("public_key_type", fmt.Sprintf("%T", c.PublicKey)).Error("Unsupported public key algorithm")
+	lgr.WithField("public_key_type", fmt.Sprintf("%T", publicKey)).Error("Unsupported public key algorithm")
 	return x509.ErrUnsupportedAlgorithm
+}
+
+// verifyDSASignature verifies a DSA signature by unmarshaling the ASN.1 encoded signature
+// and validating the R and S components before performing cryptographic verification.
+func verifyDSASignature(pub *dsa.PublicKey, digest, signature []byte) error {
+	dsaSig := new(dsaSignature)
+	if _, err := asn1.Unmarshal(signature, dsaSig); err != nil {
+		lgr.WithError(err).Error("Failed to unmarshal DSA signature")
+		return err
+	}
+	// Validate DSA signature components are positive integers
+	// Zero or negative values indicate malformed or invalid signatures
+	if dsaSig.R.Sign() <= 0 || dsaSig.S.Sign() <= 0 {
+		lgr.WithField("r_sign", dsaSig.R.Sign()).WithField("s_sign", dsaSig.S.Sign()).Error("DSA signature contained zero or negative values")
+		return errors.New("x509: DSA signature contained zero or negative values")
+	}
+	if !dsa.Verify(pub, digest, dsaSig.R, dsaSig.S) {
+		lgr.Error("DSA signature verification failed")
+		return errors.New("x509: DSA verification failure")
+	}
+	return nil
+}
+
+// verifyECDSASignature verifies an ECDSA signature by unmarshaling the ASN.1 encoded signature
+// and validating the R and S components before performing cryptographic verification.
+func verifyECDSASignature(pub *ecdsa.PublicKey, digest, signature []byte) error {
+	ecdsaSig := new(ecdsaSignature)
+	if _, err := asn1.Unmarshal(signature, ecdsaSig); err != nil {
+		lgr.WithError(err).Error("Failed to unmarshal ECDSA signature")
+		return err
+	}
+	// Validate ECDSA signature components are positive integers
+	// Similar validation to DSA as both use R,S component pairs
+	if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 {
+		lgr.WithField("r_sign", ecdsaSig.R.Sign()).WithField("s_sign", ecdsaSig.S.Sign()).Error("ECDSA signature contained zero or negative values")
+		return errors.New("x509: ECDSA signature contained zero or negative values")
+	}
+	if !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
+		lgr.Error("ECDSA signature verification failed")
+		return errors.New("x509: ECDSA verification failure")
+	}
+	return nil
 }
 
 // NewSigningCertificate creates a self-signed X.509 certificate for SU3 file signing.
