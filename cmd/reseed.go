@@ -240,34 +240,54 @@ func CreateEepServiceKey(c *cli.Context) (i2pkeys.I2PKeys, error) {
 func LoadKeys(keysPath string, c *cli.Context) (i2pkeys.I2PKeys, error) {
 	// Check if keys file exists, create new keys if not found
 	if _, err := os.Stat(keysPath); os.IsNotExist(err) {
-		keys, err := CreateEepServiceKey(c)
-		if err != nil {
-			return i2pkeys.I2PKeys{}, err
-		}
-		file, err := os.Create(keysPath)
-		if err != nil {
-			return i2pkeys.I2PKeys{}, err
-		}
-		defer file.Close()
-		err = i2pkeys.StoreKeysIncompat(keys, file)
-		if err != nil {
-			return i2pkeys.I2PKeys{}, err
-		}
-		return keys, nil
+		return createAndStoreNewKeys(keysPath, c)
 	} else if err == nil {
-		file, err := os.Open(keysPath)
-		if err != nil {
-			return i2pkeys.I2PKeys{}, err
-		}
-		defer file.Close()
-		keys, err := i2pkeys.LoadKeysIncompat(file)
-		if err != nil {
-			return i2pkeys.I2PKeys{}, err
-		}
-		return keys, nil
+		return loadExistingKeys(keysPath)
 	} else {
 		return i2pkeys.I2PKeys{}, err
 	}
+}
+
+// createAndStoreNewKeys generates new I2P keys and saves them to the specified file path.
+func createAndStoreNewKeys(keysPath string, c *cli.Context) (i2pkeys.I2PKeys, error) {
+	keys, err := CreateEepServiceKey(c)
+	if err != nil {
+		return i2pkeys.I2PKeys{}, err
+	}
+
+	err = persistKeysToFile(keys, keysPath)
+	if err != nil {
+		return i2pkeys.I2PKeys{}, err
+	}
+
+	return keys, nil
+}
+
+// loadExistingKeys reads and parses I2P keys from an existing file.
+func loadExistingKeys(keysPath string) (i2pkeys.I2PKeys, error) {
+	file, err := os.Open(keysPath)
+	if err != nil {
+		return i2pkeys.I2PKeys{}, err
+	}
+	defer file.Close()
+
+	keys, err := i2pkeys.LoadKeysIncompat(file)
+	if err != nil {
+		return i2pkeys.I2PKeys{}, err
+	}
+
+	return keys, nil
+}
+
+// persistKeysToFile writes I2P keys to the specified file path using the incompatible format.
+func persistKeysToFile(keys i2pkeys.I2PKeys, keysPath string) error {
+	file, err := os.Create(keysPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return i2pkeys.StoreKeysIncompat(keys, file)
 }
 
 // fileExists checks if a file exists and is not a directory before we
