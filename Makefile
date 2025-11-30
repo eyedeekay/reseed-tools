@@ -51,6 +51,8 @@ install:
 	install -m755 etc/init.d/reseed ${prefix}etc/init.d/reseed
 	install -g i2psvc -o i2psvc -D -d ${prefix}var/lib/i2p/i2p-config/reseed/
 	install -g i2psvc -o i2psvc -D -d ${prefix}etc/systemd/system/reseed.service.d/
+	install -m644 etc/apparmor.d/usr.bin.reseed-tools ${prefix}etc/apparmor.d/usr.bin.reseed-tools
+	install -m644 etc/apparmor.d/local/usr.bin.reseed-tools ${prefix}etc/apparmor.d/local/usr.bin.reseed-tools
 	install -m644 etc/systemd/system/reseed.service.d/override.conf ${prefix}etc/systemd/system/reseed.service.d/override.conf
 	install -m644 etc/systemd/system/reseed.service ${prefix}etc/systemd/system/reseed.service
 
@@ -58,6 +60,8 @@ uninstall:
 	rm -rf ${prefix}bin/reseed-tools
 	rm -rf ${prefix}etc/default/reseed
 	rm -rf ${prefix}etc/init.d/reseed
+	rm -rf ${prefix}etc/apparmor.d/usr.bin.reseed-tools
+	rm -rf ${prefix}etc/apparmor.d/local/usr.bin.reseed-tools
 	rm -rf ${prefix}etc/systemd/system/reseed.service.d/reseed.conf
 	rm -rf ${prefix}etc/systemd/system/reseed.service
 	rm -rf ${prefix}var/lib/i2p/i2p-config/reseed/
