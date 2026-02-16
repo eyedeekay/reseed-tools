@@ -1,9 +1,13 @@
+2026-02-16
+ * app.Version = 0.3.11
+ * resolve a bug caused by a misconfigured rate-limiter
+
 2024-06-29
- * app.Version = 2.5
+ * app.Version = 0.2.5
  * Add password-protected netDb sync capability
 
 2024-06-25
- * app.Version = 2.4
+ * app.Version = 0.2.4
  * Remove dependency on libp2p
  * Use go-i2p to parse RouterInfos prior to inclusion in reseed bundles, exclude less-useful RIs
 
