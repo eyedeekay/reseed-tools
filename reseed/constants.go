@@ -3,7 +3,7 @@ package reseed
 // Version defines the current release version of the reseed-tools application.
 // This version string is used for compatibility checking, update notifications,
 // and identifying the software version in server responses and logs.
-const Version = "0.3.10"
+const Version = "0.3.11"
 
 // HTTP User-Agent constants for I2P protocol compatibility
 const (
