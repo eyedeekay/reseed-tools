@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -67,22 +68,55 @@ func NewSu3VerifyCommand() *cli.Command {
 	}
 }
 
+// su3VerifyAction performs comprehensive verification of SU3 files including signature validation.
 func su3VerifyAction(c *cli.Context) error {
-	su3File := su3.New()
-
-	data, err := ioutil.ReadFile(c.Args().Get(0))
-	if nil != err {
-		return err
-	}
-	if err := su3File.UnmarshalBinary(data); err != nil {
+	su3File, err := loadAndParseSU3File(c.Args().Get(0))
+	if err != nil {
 		return err
 	}
 
 	fmt.Println(su3File.String())
-	absPath, err := filepath.Abs(c.String("keystore"))
-	if nil != err {
+
+	cert, err := configureAndGetCertificate(c, su3File)
+	if err != nil {
 		return err
 	}
+
+	err = verifySignature(su3File, cert)
+	if err != nil {
+		return err
+	}
+
+	if c.Bool("extract") {
+		return extractSU3Content(su3File)
+	}
+
+	return nil
+}
+
+// loadAndParseSU3File reads and unmarshals an SU3 file from the specified path.
+func loadAndParseSU3File(filePath string) (*su3.File, error) {
+	su3File := su3.New()
+
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := su3File.UnmarshalBinary(data); err != nil {
+		return nil, err
+	}
+
+	return su3File, nil
+}
+
+// configureAndGetCertificate sets up keystore configuration and retrieves the reseeder certificate.
+func configureAndGetCertificate(c *cli.Context, su3File *su3.File) (*x509.Certificate, error) {
+	absPath, err := filepath.Abs(c.String("keystore"))
+	if err != nil {
+		return nil, err
+	}
+
 	keyStorePath := filepath.Dir(absPath)
 	reseedDir := filepath.Base(absPath)
 
@@ -92,23 +126,30 @@ func su3VerifyAction(c *cli.Context) error {
 	if c.String("signer") != "" {
 		su3File.SignerID = []byte(c.String("signer"))
 	}
+
 	lgr.WithField("keystore", absPath).WithField("purpose", reseedDir).WithField("signer", string(su3File.SignerID)).Debug("Using keystore")
 
 	cert, err := ks.DirReseederCertificate(reseedDir, su3File.SignerID)
-	if nil != err {
+	if err != nil {
 		fmt.Println(err)
-		return err
+		return nil, err
 	}
 
-	if err := su3File.VerifySignature(cert); nil != err {
+	return cert, nil
+}
+
+// verifySignature validates the SU3 file signature against the provided certificate.
+func verifySignature(su3File *su3.File, cert *x509.Certificate) error {
+	if err := su3File.VerifySignature(cert); err != nil {
 		return err
 	}
 
 	fmt.Printf("Signature is valid for signer '%s'\n", su3File.SignerID)
-
-	if c.Bool("extract") {
-		// @todo: don't assume zip
-		ioutil.WriteFile("extracted.zip", su3File.BodyBytes(), 0o755)
-	}
 	return nil
+}
+
+// extractSU3Content extracts the content from an SU3 file to a zip file.
+func extractSU3Content(su3File *su3.File) error {
+	// @todo: don't assume zip
+	return ioutil.WriteFile("extracted.zip", su3File.BodyBytes(), 0o755)
 }

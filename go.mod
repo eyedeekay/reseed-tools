@@ -4,7 +4,6 @@ go 1.24.2
 
 require (
 	github.com/cretz/bine v0.2.0
-	github.com/eyedeekay/go-i2pd v0.0.0-20220213070306-9807541b2dfc
 	github.com/eyedeekay/unembed v0.0.0-20230123014222-9916b121855b
 	github.com/go-acme/lego/v4 v4.3.1
 	github.com/go-i2p/checki2cp v0.0.0-20250819201001-7a3f89fafac8

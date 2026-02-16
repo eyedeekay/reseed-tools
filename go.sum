@@ -100,9 +100,6 @@ github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFP
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/exoscale/egoscale v0.46.0/go.mod h1:mpEXBpROAa/2i5GC0r33rfxG+TxSEka11g1PIXt9+zc=
-github.com/eyedeekay/go-i2pd v0.0.0-20220213070306-9807541b2dfc h1:ozp8Cxn9nsFF+p4tMcE63G0Kx+2lEywlCW0EvtISEZg=
-github.com/eyedeekay/go-i2pd v0.0.0-20220213070306-9807541b2dfc/go.mod h1:Yg8xCWRLyq0mezPV+xJygBhJCf7wYsIdXbYGQk5tnW8=
-github.com/eyedeekay/i2pd v0.3.0-1stbinrelease.0.20210702172028-5d01ee95810a/go.mod h1:4qJhWn+yNrWRbqFHhU8kl7JgbcW1hm3PMgvlPlxO3gg=
 github.com/eyedeekay/unembed v0.0.0-20230123014222-9916b121855b h1:QyCSwbHpkJtKGvIvHsvvlbDkf7/3a8qUlaa4rEr8myQ=
 github.com/eyedeekay/unembed v0.0.0-20230123014222-9916b121855b/go.mod h1:A6dZU88muI132XMrmdM0+cc2yIuwmhwgRfyrU54DjPc=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
