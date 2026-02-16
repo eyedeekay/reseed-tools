@@ -71,8 +71,8 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	h := &http.Server{TLSConfig: config}
 	server := Server{Server: h, Reseeder: nil}
 
-	th := throttled.RateLimit(throttled.PerHour(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(200000))
-	thw := throttled.RateLimit(throttled.PerHour(30), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(200000))
+	throttleSu3Handler := throttled.RateLimit(throttled.PerHour(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(200000))
+	throttleWebHandler := throttled.RateLimit(throttled.PerHour(30), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(200000))
 
 	middlewareChain := alice.New()
 	if trustProxy {
@@ -87,8 +87,8 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	})
 
 	mux := http.NewServeMux()
-	mux.Handle("/", middlewareChain.Append(disableKeepAliveMiddleware, loggingMiddleware, thw.Throttle, server.browsingMiddleware).Then(errorHandler))
-	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Append(disableKeepAliveMiddleware, loggingMiddleware, verifyMiddleware, th.Throttle).Then(http.HandlerFunc(server.reseedHandler)))
+	mux.Handle("/", middlewareChain.Append(disableKeepAliveMiddleware, loggingMiddleware, throttleWebHandler.RateLimit, server.browsingMiddleware).Then(errorHandler))
+	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Append(disableKeepAliveMiddleware, loggingMiddleware, verifyMiddleware, throttleSu3Handler.RateLimit).Then(http.HandlerFunc(server.reseedHandler)))
 	server.Handler = mux
 
 	return &server
