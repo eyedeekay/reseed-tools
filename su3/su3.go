@@ -56,9 +56,6 @@ type File struct {
 // New creates a new SU3 file with default settings and current timestamp.
 // The file is initialized with RSA-SHA512 signature type and a Unix timestamp version.
 // Additional fields must be set before signing and distribution.
-// New creates a new SU3 file with default settings and current timestamp.
-// The file is initialized with RSA-SHA512 signature type and a Unix timestamp version.
-// Additional fields must be set before signing and distribution.
 func New() *File {
 	return &File{
 		Version:       []byte(strconv.FormatInt(time.Now().Unix(), 10)),
@@ -241,6 +238,8 @@ func ecdsaCanonicalSigLen(key *ecdsa.PrivateKey) int {
 // This includes the magic header, metadata fields, and content data in the proper SU3 format.
 // The signature field length is calculated but the actual signature bytes are not included.
 // This data is used for signature generation and verification operations.
+//
+// BodyBytes does not mutate the receiver. Version padding is applied to a local copy.
 func (s *File) BodyBytes() []byte {
 	var (
 		buf = new(bytes.Buffer)
@@ -248,11 +247,20 @@ func (s *File) BodyBytes() []byte {
 		skip    [1]byte
 		bigSkip [12]byte
 
-		versionLength   = uint8(len(s.Version))
 		signatureLength = uint16(512)
 		signerIDLength  = uint8(len(s.SignerID))
 		contentLength   = uint64(len(s.Content))
 	)
+
+	// Build a local version copy that meets the minimum length requirement.
+	// We never modify s.Version so callers see consistent state after calling BodyBytes.
+	version := s.Version
+	if len(version) < minVersionLength {
+		padded := make([]byte, minVersionLength)
+		copy(padded, version)
+		version = padded
+	}
+	versionLength := uint8(len(version))
 
 	// Calculate signature length based on algorithm and available signature data.
 	// For RSA, signature length is fixed by key size. For ECDSA, we use
@@ -296,7 +304,7 @@ func (s *File) BodyBytes() []byte {
 		if len(s.Signature) > 0 {
 			signatureLength = uint16(len(s.Signature))
 		} else {
-			signatureLength = uint16(256) // Default for 2048-bit RSA key
+			signatureLength = uint16(512) // Default for 4096-bit RSA key (standard)
 		}
 	case SigTypeEdDSASHA512Ed25519ph:
 		// Ed25519 signatures are always exactly 64 bytes per I2P spec and RFC 8032.
@@ -304,35 +312,34 @@ func (s *File) BodyBytes() []byte {
 		signatureLength = uint16(ed25519.SignatureSize)
 	}
 
-	// Ensure version field meets minimum length requirement by zero-padding
-	// SU3 specification requires version fields to be at least minVersionLength bytes
-	if len(s.Version) < minVersionLength {
-		minBytes := make([]byte, minVersionLength)
-		copy(minBytes, s.Version)
-		s.Version = minBytes
-		versionLength = uint8(len(s.Version))
+	// Write SU3 file header in big-endian binary format following specification.
+	// Each field is written in the exact order and size required by the SU3 format.
+	// binary.Write to a bytes.Buffer is documented to never return an error,
+	// so we use writeBE to panic on the impossible case rather than silently discard.
+	writeBE := func(v interface{}) {
+		if err := binary.Write(buf, binary.BigEndian, v); err != nil {
+			panic(fmt.Sprintf("su3: binary.Write to bytes.Buffer failed: %v", err))
+		}
 	}
 
-	// Write SU3 file header in big-endian binary format following specification
-	// Each field is written in the exact order and size required by the SU3 format
-	binary.Write(buf, binary.BigEndian, []byte(magicBytes))
-	binary.Write(buf, binary.BigEndian, skip)
-	binary.Write(buf, binary.BigEndian, s.Format)
-	binary.Write(buf, binary.BigEndian, s.SignatureType)
-	binary.Write(buf, binary.BigEndian, signatureLength)
-	binary.Write(buf, binary.BigEndian, skip)
-	binary.Write(buf, binary.BigEndian, versionLength)
-	binary.Write(buf, binary.BigEndian, skip)
-	binary.Write(buf, binary.BigEndian, signerIDLength)
-	binary.Write(buf, binary.BigEndian, contentLength)
-	binary.Write(buf, binary.BigEndian, skip)
-	binary.Write(buf, binary.BigEndian, s.FileType)
-	binary.Write(buf, binary.BigEndian, skip)
-	binary.Write(buf, binary.BigEndian, s.ContentType)
-	binary.Write(buf, binary.BigEndian, bigSkip)
-	binary.Write(buf, binary.BigEndian, s.Version)
-	binary.Write(buf, binary.BigEndian, s.SignerID)
-	binary.Write(buf, binary.BigEndian, s.Content)
+	writeBE([]byte(magicBytes))
+	writeBE(skip)
+	writeBE(s.Format)
+	writeBE(s.SignatureType)
+	writeBE(signatureLength)
+	writeBE(skip)
+	writeBE(versionLength)
+	writeBE(skip)
+	writeBE(signerIDLength)
+	writeBE(contentLength)
+	writeBE(skip)
+	writeBE(s.FileType)
+	writeBE(skip)
+	writeBE(s.ContentType)
+	writeBE(bigSkip)
+	writeBE(version)
+	writeBE(s.SignerID)
+	writeBE(s.Content)
 
 	return buf.Bytes()
 }

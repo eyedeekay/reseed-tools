@@ -256,6 +256,137 @@ func TestFile_BodyBytes(t *testing.T) {
 	}
 }
 
+// TestFile_BodyBytes_DoesNotMutateVersion verifies that BodyBytes() does not
+// modify the receiver's Version field when zero-padding is needed. This was
+// a bug where s.Version was mutated in-place during serialization.
+func TestFile_BodyBytes_DoesNotMutateVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version []byte
+	}{
+		{"short version", []byte("123")},
+		{"single byte", []byte("X")},
+		{"empty version", []byte{}},
+		{"exactly min length", make([]byte, minVersionLength)},
+		{"longer than min", []byte("this-is-a-long-version-string-here")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := New()
+			file.Content = []byte("content")
+			file.SignerID = []byte("signer@example.com")
+
+			// Make a copy of the original version bytes
+			original := make([]byte, len(tt.version))
+			copy(original, tt.version)
+			file.Version = tt.version
+
+			// Call BodyBytes multiple times — should be idempotent and non-mutating
+			_ = file.BodyBytes()
+			_ = file.BodyBytes()
+
+			if !bytes.Equal(file.Version, original) {
+				t.Errorf("BodyBytes() mutated Version: got %q, want %q", file.Version, original)
+			}
+			if len(file.Version) != len(original) {
+				t.Errorf("BodyBytes() changed Version length: got %d, want %d", len(file.Version), len(original))
+			}
+		})
+	}
+}
+
+// TestFile_BodyBytes_RSA512FallbackSignatureLength verifies that the fallback
+// signature length for SigTypeRSAWithSHA512 (when no signature is set) is 512
+// bytes, matching the 4096-bit RSA key that createSigningCertificate generates.
+func TestFile_BodyBytes_RSA512FallbackSignatureLength(t *testing.T) {
+	tests := []struct {
+		name             string
+		sigType          uint16
+		expectedFallback uint16
+	}{
+		{"RSA-SHA256 fallback", SigTypeRSAWithSHA256, 256},
+		{"RSA-SHA384 fallback", SigTypeRSAWithSHA384, 384},
+		{"RSA-SHA512 fallback", SigTypeRSAWithSHA512, 512},
+		{"ECDSA-SHA256 fallback", SigTypeECDSAWithSHA256, 72},
+		{"ECDSA-SHA384 fallback", SigTypeECDSAWithSHA384, 104},
+		{"ECDSA-SHA512 fallback", SigTypeECDSAWithSHA512, 141},
+		{"EdDSA fallback", SigTypeEdDSASHA512Ed25519ph, 64},
+		{"DSA fallback", SigTypeDSA, 40},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := &File{
+				Version:       []byte("1234567890123456"), // >= minVersionLength
+				SignerID:      []byte("test@example.com"),
+				Content:       []byte("test content"),
+				SignatureType: tt.sigType,
+				// Signature intentionally left nil — test fallback path
+			}
+
+			bodyBytes := file.BodyBytes()
+
+			// Parse the signature length from the header (offset 8, uint16 big-endian).
+			// SU3 header layout: magic(6) + skip(1) + format(1) + sigType(2) + sigLen(2)
+			if len(bodyBytes) < 12 {
+				t.Fatal("BodyBytes too short to contain header")
+			}
+			sigLen := binary.BigEndian.Uint16(bodyBytes[10:12])
+			if sigLen != tt.expectedFallback {
+				t.Errorf("fallback signature length = %d, want %d", sigLen, tt.expectedFallback)
+			}
+		})
+	}
+}
+
+// TestFile_BodyBytes_SignatureLengthFromActualSignature verifies that when
+// Signature is populated, BodyBytes() uses len(Signature) for the header field
+// regardless of the default fallback value.
+func TestFile_BodyBytes_SignatureLengthFromActualSignature(t *testing.T) {
+	file := &File{
+		Version:       []byte("1234567890123456"),
+		SignerID:      []byte("test@example.com"),
+		Content:       []byte("test"),
+		SignatureType: SigTypeRSAWithSHA512,
+		Signature:     make([]byte, 256), // e.g. from a 2048-bit key
+	}
+
+	bodyBytes := file.BodyBytes()
+	sigLen := binary.BigEndian.Uint16(bodyBytes[10:12])
+	if sigLen != 256 {
+		t.Errorf("signature length from actual Signature = %d, want 256", sigLen)
+	}
+
+	// Now with a 4096-bit key signature (512 bytes)
+	file.Signature = make([]byte, 512)
+	bodyBytes = file.BodyBytes()
+	sigLen = binary.BigEndian.Uint16(bodyBytes[10:12])
+	if sigLen != 512 {
+		t.Errorf("signature length from actual Signature = %d, want 512", sigLen)
+	}
+}
+
+// TestFile_BodyBytes_Idempotent verifies that repeated calls to BodyBytes()
+// produce identical output, confirming no side effects.
+func TestFile_BodyBytes_Idempotent(t *testing.T) {
+	file := New()
+	file.Content = []byte("test content")
+	file.SignerID = []byte("test@example.com")
+	file.Version = []byte("short") // Will trigger padding
+
+	first := file.BodyBytes()
+	second := file.BodyBytes()
+	third := file.BodyBytes()
+
+	if !bytes.Equal(first, second) {
+		t.Error("BodyBytes() is not idempotent: first != second")
+	}
+	if !bytes.Equal(second, third) {
+		t.Error("BodyBytes() is not idempotent: second != third")
+	}
+}
+
 func TestFile_MarshalBinary(t *testing.T) {
 	file := New()
 	file.Content = []byte("test content")
