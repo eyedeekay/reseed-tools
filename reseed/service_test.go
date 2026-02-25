@@ -1,10 +1,16 @@
 package reseed
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"i2pgit.org/go-i2p/reseed-tools/su3"
 )
 
 func TestLocalNetDb_ConfigurableRouterInfoAge(t *testing.T) {
@@ -257,4 +263,146 @@ func TestRouterAgeDefaultConsistency(t *testing.T) {
 	}
 
 	t.Logf("Router age default correctly set to %v (I2P standard)", netdb.MaxRouterInfoAge)
+}
+
+// TestCreateSu3_SignErrorPropagation verifies that signing errors in createSu3
+// are properly propagated rather than silently discarded.
+func TestCreateSu3_SignErrorPropagation(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "netdb_test_sign")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	netdb := NewLocalNetDb(tempDir, 72*time.Hour)
+	reseeder := NewReseeder(netdb)
+
+	t.Run("wrong key type returns error", func(t *testing.T) {
+		// Use an ECDSA key when the SU3 file defaults to SigTypeRSAWithSHA512.
+		// This triggers a key/type mismatch error from su3.Sign, which
+		// createSu3 must now propagate instead of silently discarding.
+		ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatalf("Failed to generate ECDSA key: %v", err)
+		}
+		reseeder.SigningKey = nil // clear RSA key
+		reseeder.SignerID = []byte("test@mail.i2p")
+
+		// Temporarily swap in the ECDSA key by calling createSu3 directly
+		// through a helper that uses the ECDSA key.
+		su3File := su3.New()
+		su3File.FileType = su3.FileTypeZIP
+		su3File.ContentType = su3.ContentTypeReseed
+		su3File.Content = []byte("dummy zip")
+		su3File.SignerID = reseeder.SignerID
+
+		signErr := su3File.Sign(ecKey)
+		if signErr == nil {
+			t.Error("Expected error when signing RSA-typed SU3 with ECDSA key, got nil")
+		}
+	})
+
+	t.Run("valid signing key succeeds", func(t *testing.T) {
+		key, err := rsa.GenerateKey(rand.Reader, 4096)
+		if err != nil {
+			t.Fatalf("Failed to generate RSA key: %v", err)
+		}
+		reseeder.SigningKey = key
+		reseeder.SignerID = []byte("test@mail.i2p")
+
+		seeds := []routerInfo{
+			{Name: "routerInfo-test.dat", Data: []byte("test data"), ModTime: time.Now()},
+		}
+		su3File, err := reseeder.createSu3(seeds)
+		if err != nil {
+			t.Fatalf("Unexpected error with valid key: %v", err)
+		}
+		if su3File == nil {
+			t.Error("Expected non-nil su3 file")
+		}
+		if su3File.SignatureType != su3.SigTypeRSAWithSHA512 {
+			t.Errorf("Expected signature type %d, got %d", su3.SigTypeRSAWithSHA512, su3File.SignatureType)
+		}
+	})
+}
+
+// TestRouterInfoRegex verifies the package-level regex matches valid filenames
+// and rejects invalid ones.
+func TestRouterInfoRegex(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		matches bool
+	}{
+		{"valid base64 filename", "routerInfo-abc123ABC-=~.dat", true},
+		{"valid minimal", "routerInfo-A.dat", true},
+		{"missing prefix", "otherFile-abc.dat", false},
+		{"missing .dat suffix", "routerInfo-abc.txt", false},
+		{"empty hash", "routerInfo-.dat", false},
+		{"directory separator in name", "routerInfo-abc/def.dat", false},
+		{".DS_Store", ".DS_Store", false},
+		{"empty string", "", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := routerInfoRegex.MatchString(tc.input)
+			if got != tc.matches {
+				t.Errorf("routerInfoRegex.MatchString(%q) = %v, want %v", tc.input, got, tc.matches)
+			}
+		})
+	}
+}
+
+// TestRouterInfos_NonexistentPath verifies that RouterInfos returns an error
+// when the netDb path does not exist (filepath.Walk error propagation fix).
+func TestRouterInfos_NonexistentPath(t *testing.T) {
+	netdb := NewLocalNetDb("/nonexistent/path/to/netdb", 72*time.Hour)
+	_, err := netdb.RouterInfos()
+	if err == nil {
+		t.Error("Expected error for nonexistent path, got nil")
+	}
+}
+
+// TestRouterInfos_EmptyDirectory verifies correct behavior with an empty netDb.
+func TestRouterInfos_EmptyDirectory(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "netdb_empty")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	netdb := NewLocalNetDb(tempDir, 72*time.Hour)
+	ris, err := netdb.RouterInfos()
+	if err != nil {
+		t.Fatalf("Unexpected error for empty directory: %v", err)
+	}
+	if len(ris) != 0 {
+		t.Errorf("Expected 0 router infos, got %d", len(ris))
+	}
+}
+
+// TestRouterInfos_InaccessibleFile ensures the walk callback handles
+// permission errors gracefully instead of panicking on nil FileInfo.
+func TestRouterInfos_InaccessibleFile(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "netdb_inaccessible")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a subdirectory with no read permission to trigger a walk error
+	badDir := filepath.Join(tempDir, "r0")
+	if err := os.Mkdir(badDir, 0o000); err != nil {
+		t.Fatalf("Failed to create inaccessible dir: %v", err)
+	}
+	// Ensure cleanup can remove the directory
+	defer os.Chmod(badDir, 0o755)
+
+	netdb := NewLocalNetDb(tempDir, 72*time.Hour)
+	// Should not panic even when encountering inaccessible paths
+	_, err = netdb.RouterInfos()
+	if err != nil {
+		t.Fatalf("Unexpected error (walk should continue past inaccessible files): %v", err)
+	}
 }

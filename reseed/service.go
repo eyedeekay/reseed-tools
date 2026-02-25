@@ -239,7 +239,9 @@ func (rs *ReseederImpl) createSu3(seeds []routerInfo) (*su3.File, error) {
 	su3File.Content = zipped
 
 	su3File.SignerID = rs.SignerID
-	su3File.Sign(rs.SigningKey)
+	if err := su3File.Sign(rs.SigningKey); err != nil {
+		return nil, fmt.Errorf("error signing su3 file: %w", err)
+	}
 
 	return su3File, nil
 }
@@ -270,18 +272,27 @@ func NewLocalNetDb(path string, maxAge time.Duration) *LocalNetDbImpl {
 	}
 }
 
-func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
-	r, _ := regexp.Compile("^routerInfo-[A-Za-z0-9-=~]+.dat$")
+// routerInfoRegex matches valid I2P routerInfo filenames. Compiled once at
+// package level for performance and correctness (avoids discarding compile error).
+var routerInfoRegex = regexp.MustCompile(`^routerInfo-[A-Za-z0-9-=~]+\.dat$`)
 
+func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 	files := make(map[string]os.FileInfo)
-	walkpath := func(path string, f os.FileInfo, err error) error {
-		if r.MatchString(f.Name()) {
+	walkpath := func(path string, f os.FileInfo, walkErr error) error {
+		// Per filepath.Walk contract, f may be nil when walkErr is non-nil
+		if walkErr != nil {
+			lgr.WithError(walkErr).WithField("path", path).Error("Error walking netDb directory")
+			return nil // continue walking other entries
+		}
+		if routerInfoRegex.MatchString(f.Name()) {
 			files[path] = f
 		}
 		return nil
 	}
 
-	filepath.Walk(db.Path, walkpath)
+	if walkErr := filepath.Walk(db.Path, walkpath); walkErr != nil {
+		return nil, fmt.Errorf("error walking netDb path %q: %w", db.Path, walkErr)
+	}
 
 	for path, file := range files {
 		riBytes, err := os.ReadFile(path)
