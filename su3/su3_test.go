@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/binary"
 	"reflect"
 	"strings"
 	"testing"
@@ -342,20 +343,41 @@ func TestFile_UnmarshalBinary(t *testing.T) {
 
 func TestFile_UnmarshalBinary_InvalidData(t *testing.T) {
 	tests := []struct {
-		name string
-		data []byte
+		name      string
+		data      []byte
+		wantErr   bool
+		errSubstr string
 	}{
 		{
-			name: "Empty data",
-			data: []byte{},
+			name:      "Empty data",
+			data:      []byte{},
+			wantErr:   true,
+			errSubstr: "failed to read magic bytes",
 		},
 		{
-			name: "Too short data",
-			data: []byte("short"),
+			name:      "Too short data",
+			data:      []byte("short"),
+			wantErr:   true,
+			errSubstr: "failed to read magic bytes",
 		},
 		{
-			name: "Invalid magic bytes",
-			data: append([]byte("BADMAG"), make([]byte, 100)...),
+			name:      "Invalid magic bytes",
+			data:      append([]byte("BADMAG"), make([]byte, 100)...),
+			wantErr:   true,
+			errSubstr: "invalid magic bytes",
+		},
+		{
+			name:      "Valid magic but truncated header",
+			data:      []byte("I2Psu3"),
+			wantErr:   true,
+			errSubstr: "failed to read",
+		},
+		{
+			name: "Valid magic with partial header",
+			// Magic (6) + skip (1) + format (1) = 8 bytes, but truncated before signature type
+			data:      append([]byte("I2Psu3"), []byte{0x00, 0x00}...),
+			wantErr:   true,
+			errSubstr: "failed to read",
 		},
 	}
 
@@ -363,10 +385,146 @@ func TestFile_UnmarshalBinary_InvalidData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			file := &File{}
 			err := file.UnmarshalBinary(tt.data)
-			// Note: The current implementation doesn't validate magic bytes or handle errors gracefully
-			// This test documents the current behavior
-			_ = err // We expect this might fail, but we're testing it doesn't panic
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got nil")
+				} else if !strings.Contains(err.Error(), tt.errSubstr) {
+					t.Errorf("Expected error containing %q, got %q", tt.errSubstr, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
 		})
+	}
+}
+
+func TestFile_UnmarshalBinary_ExtremeContentLength(t *testing.T) {
+	// Build a valid SU3 header with an extreme contentLength to test OOM protection.
+	// The header layout is:
+	//   magic(6) + skip(1) + format(1) + sigType(2) + sigLen(2) + skip(1)
+	//   + verLen(1) + skip(1) + signerIDLen(1) + contentLen(8) + skip(1)
+	//   + fileType(1) + skip(1) + contentType(1) + bigSkip(12)
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, []byte("I2Psu3"))       // magic
+	binary.Write(buf, binary.BigEndian, [1]byte{})              // skip
+	binary.Write(buf, binary.BigEndian, uint8(0))               // format
+	binary.Write(buf, binary.BigEndian, uint16(6))              // sigType (RSA-SHA512)
+	binary.Write(buf, binary.BigEndian, uint16(512))            // sigLen
+	binary.Write(buf, binary.BigEndian, [1]byte{})              // skip
+	binary.Write(buf, binary.BigEndian, uint8(16))              // versionLength
+	binary.Write(buf, binary.BigEndian, [1]byte{})              // skip
+	binary.Write(buf, binary.BigEndian, uint8(0))               // signerIDLength
+	binary.Write(buf, binary.BigEndian, uint64(0xFFFFFFFFFFFF)) // extreme contentLength
+	binary.Write(buf, binary.BigEndian, [1]byte{})              // skip
+	binary.Write(buf, binary.BigEndian, uint8(0))               // fileType
+	binary.Write(buf, binary.BigEndian, [1]byte{})              // skip
+	binary.Write(buf, binary.BigEndian, uint8(0))               // contentType
+	binary.Write(buf, binary.BigEndian, [12]byte{})             // bigSkip
+
+	file := &File{}
+	err := file.UnmarshalBinary(buf.Bytes())
+	if err == nil {
+		t.Fatal("Expected error for extreme content length, got nil")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum") {
+		t.Errorf("Expected 'exceeds maximum' error, got: %v", err)
+	}
+}
+
+func TestFile_UnmarshalBinary_TruncatedContent(t *testing.T) {
+	// Build a valid header that claims 1024 bytes of content but only provides 10
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, []byte("I2Psu3")) // magic
+	binary.Write(buf, binary.BigEndian, [1]byte{})        // skip
+	binary.Write(buf, binary.BigEndian, uint8(0))         // format
+	binary.Write(buf, binary.BigEndian, uint16(6))        // sigType
+	binary.Write(buf, binary.BigEndian, uint16(64))       // sigLen
+	binary.Write(buf, binary.BigEndian, [1]byte{})        // skip
+	binary.Write(buf, binary.BigEndian, uint8(16))        // versionLength
+	binary.Write(buf, binary.BigEndian, [1]byte{})        // skip
+	binary.Write(buf, binary.BigEndian, uint8(4))         // signerIDLength
+	binary.Write(buf, binary.BigEndian, uint64(1024))     // contentLength (claims 1024)
+	binary.Write(buf, binary.BigEndian, [1]byte{})        // skip
+	binary.Write(buf, binary.BigEndian, uint8(0))         // fileType
+	binary.Write(buf, binary.BigEndian, [1]byte{})        // skip
+	binary.Write(buf, binary.BigEndian, uint8(3))         // contentType
+	binary.Write(buf, binary.BigEndian, [12]byte{})       // bigSkip
+	binary.Write(buf, binary.BigEndian, make([]byte, 16)) // version (16 bytes)
+	binary.Write(buf, binary.BigEndian, []byte("test"))   // signerID (4 bytes)
+	binary.Write(buf, binary.BigEndian, make([]byte, 10)) // only 10 bytes of "content" (header claims 1024)
+
+	file := &File{}
+	err := file.UnmarshalBinary(buf.Bytes())
+	if err == nil {
+		t.Fatal("Expected error for truncated content, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to read content") {
+		t.Errorf("Expected 'failed to read content' error, got: %v", err)
+	}
+}
+
+func TestFile_UnmarshalBinary_MaxContentLength(t *testing.T) {
+	// Verify that the maxContentLength constant is 100MB
+	if maxContentLength != 100*1024*1024 {
+		t.Errorf("Expected maxContentLength to be 100MB, got %d", maxContentLength)
+	}
+
+	// Build a header with content length exactly at the limit — should not error
+	// (we won't actually provide the data, so it will fail on read, not on bounds check)
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, []byte("I2Psu3"))
+	binary.Write(buf, binary.BigEndian, [1]byte{})
+	binary.Write(buf, binary.BigEndian, uint8(0))
+	binary.Write(buf, binary.BigEndian, uint16(6))
+	binary.Write(buf, binary.BigEndian, uint16(64))
+	binary.Write(buf, binary.BigEndian, [1]byte{})
+	binary.Write(buf, binary.BigEndian, uint8(16))
+	binary.Write(buf, binary.BigEndian, [1]byte{})
+	binary.Write(buf, binary.BigEndian, uint8(0))
+	binary.Write(buf, binary.BigEndian, uint64(maxContentLength)) // exactly at limit
+	binary.Write(buf, binary.BigEndian, [1]byte{})
+	binary.Write(buf, binary.BigEndian, uint8(0))
+	binary.Write(buf, binary.BigEndian, [1]byte{})
+	binary.Write(buf, binary.BigEndian, uint8(0))
+	binary.Write(buf, binary.BigEndian, [12]byte{})
+
+	file := &File{}
+	err := file.UnmarshalBinary(buf.Bytes())
+	// Should fail on reading content (not enough data), NOT on bounds check
+	if err == nil {
+		t.Fatal("Expected error (truncated), got nil")
+	}
+	if strings.Contains(err.Error(), "exceeds maximum") {
+		t.Error("Content at exactly maxContentLength should not trigger bounds check")
+	}
+
+	// Build header with content length one over the limit
+	buf2 := new(bytes.Buffer)
+	binary.Write(buf2, binary.BigEndian, []byte("I2Psu3"))
+	binary.Write(buf2, binary.BigEndian, [1]byte{})
+	binary.Write(buf2, binary.BigEndian, uint8(0))
+	binary.Write(buf2, binary.BigEndian, uint16(6))
+	binary.Write(buf2, binary.BigEndian, uint16(64))
+	binary.Write(buf2, binary.BigEndian, [1]byte{})
+	binary.Write(buf2, binary.BigEndian, uint8(16))
+	binary.Write(buf2, binary.BigEndian, [1]byte{})
+	binary.Write(buf2, binary.BigEndian, uint8(0))
+	binary.Write(buf2, binary.BigEndian, uint64(maxContentLength+1)) // one over limit
+	binary.Write(buf2, binary.BigEndian, [1]byte{})
+	binary.Write(buf2, binary.BigEndian, uint8(0))
+	binary.Write(buf2, binary.BigEndian, [1]byte{})
+	binary.Write(buf2, binary.BigEndian, uint8(0))
+	binary.Write(buf2, binary.BigEndian, [12]byte{})
+
+	file2 := &File{}
+	err = file2.UnmarshalBinary(buf2.Bytes())
+	if err == nil {
+		t.Fatal("Expected error for content length over max, got nil")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum") {
+		t.Errorf("Expected 'exceeds maximum' error, got: %v", err)
 	}
 }
 

@@ -350,14 +350,21 @@ func (s *File) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// maxContentLength is the maximum allowed content length for SU3 files.
+// This prevents OOM panics from maliciously crafted SU3 files with extreme
+// content length fields. 100MB is generous for any legitimate SU3 content
+// (reseed bundles are typically <5MB).
+const maxContentLength = 100 * 1024 * 1024 // 100 MB
+
 // UnmarshalBinary deserializes binary data into a SU3 file structure.
 // This parses the SU3 file format and populates all fields including header metadata,
-// content, and signature. No validation is performed on the parsed data.
+// content, and signature. Returns an error if the data is malformed, truncated,
+// contains invalid magic bytes, or has content exceeding the maximum allowed size.
 func (s *File) UnmarshalBinary(data []byte) error {
 	var (
 		r = bytes.NewReader(data)
 
-		magic   = []byte(magicBytes)
+		magic   = make([]byte, len(magicBytes))
 		skip    [1]byte
 		bigSkip [12]byte
 
@@ -367,37 +374,82 @@ func (s *File) UnmarshalBinary(data []byte) error {
 		contentLength   uint64
 	)
 
-	// Read SU3 file header fields in big-endian format
-	// Each binary.Read operation should be checked for errors in production code
-	binary.Read(r, binary.BigEndian, &magic)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &s.Format)
-	binary.Read(r, binary.BigEndian, &s.SignatureType)
-	binary.Read(r, binary.BigEndian, &signatureLength)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &versionLength)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &signerIDLength)
-	binary.Read(r, binary.BigEndian, &contentLength)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &s.FileType)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &s.ContentType)
-	binary.Read(r, binary.BigEndian, &bigSkip)
+	// Read and validate magic bytes — all valid SU3 files must start with "I2Psu3"
+	if err := binary.Read(r, binary.BigEndian, &magic); err != nil {
+		return fmt.Errorf("failed to read magic bytes: %w", err)
+	}
+	if string(magic) != magicBytes {
+		return fmt.Errorf("invalid magic bytes: expected %q, got %q", magicBytes, string(magic))
+	}
+
+	// Read fixed-length header fields in big-endian format following SU3 specification
+	if err := binary.Read(r, binary.BigEndian, &skip); err != nil {
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &s.Format); err != nil {
+		return fmt.Errorf("failed to read format: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &s.SignatureType); err != nil {
+		return fmt.Errorf("failed to read signature type: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &signatureLength); err != nil {
+		return fmt.Errorf("failed to read signature length: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &skip); err != nil {
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &versionLength); err != nil {
+		return fmt.Errorf("failed to read version length: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &skip); err != nil {
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &signerIDLength); err != nil {
+		return fmt.Errorf("failed to read signer ID length: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &contentLength); err != nil {
+		return fmt.Errorf("failed to read content length: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &skip); err != nil {
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &s.FileType); err != nil {
+		return fmt.Errorf("failed to read file type: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &skip); err != nil {
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &s.ContentType); err != nil {
+		return fmt.Errorf("failed to read content type: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &bigSkip); err != nil {
+		return fmt.Errorf("failed to read header padding: %w", err)
+	}
+
+	// Validate content length to prevent OOM from maliciously crafted SU3 files
+	if contentLength > maxContentLength {
+		return fmt.Errorf("content length %d exceeds maximum allowed %d bytes", contentLength, maxContentLength)
+	}
 
 	// Allocate byte slices based on header length fields
-	// These lengths determine how much data to read for each variable-length field
 	s.Version = make([]byte, versionLength)
 	s.SignerID = make([]byte, signerIDLength)
 	s.Content = make([]byte, contentLength)
 	s.Signature = make([]byte, signatureLength)
 
 	// Read variable-length data fields in the order specified by SU3 format
-	// Version, SignerID, Content, and Signature follow the fixed header fields
-	binary.Read(r, binary.BigEndian, &s.Version)
-	binary.Read(r, binary.BigEndian, &s.SignerID)
-	binary.Read(r, binary.BigEndian, &s.Content)
-	binary.Read(r, binary.BigEndian, &s.Signature)
+	if err := binary.Read(r, binary.BigEndian, &s.Version); err != nil {
+		return fmt.Errorf("failed to read version: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &s.SignerID); err != nil {
+		return fmt.Errorf("failed to read signer ID: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &s.Content); err != nil {
+		return fmt.Errorf("failed to read content: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &s.Signature); err != nil {
+		return fmt.Errorf("failed to read signature: %w", err)
+	}
 
 	return nil
 }
