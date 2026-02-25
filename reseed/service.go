@@ -281,6 +281,10 @@ func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 	walkpath := func(path string, f os.FileInfo, walkErr error) error {
 		// Per filepath.Walk contract, f may be nil when walkErr is non-nil
 		if walkErr != nil {
+			// If the root path is inaccessible, stop the walk entirely
+			if path == db.Path {
+				return walkErr
+			}
 			lgr.WithError(walkErr).WithField("path", path).Error("Error walking netDb directory")
 			return nil // continue walking other entries
 		}
