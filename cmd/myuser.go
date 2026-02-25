@@ -11,7 +11,6 @@ import (
 // email registration, private key management, and certificate provisioning.
 // Taken directly from the lego example, since we need very minimal support
 // https://go-acme.github.io/lego/usage/library/
-// Moved from: utils.go
 type MyUser struct {
 	Email        string
 	Registration *registration.Resource
@@ -21,7 +20,6 @@ type MyUser struct {
 // NewMyUser creates a new ACME user with the given email and private key.
 // The email is used for ACME registration and the private key for cryptographic operations.
 // Returns a configured MyUser instance ready for certificate generation.
-// Moved from: utils.go
 func NewMyUser(email string, key crypto.PrivateKey) *MyUser {
 	return &MyUser{
 		Email: email,
@@ -31,21 +29,18 @@ func NewMyUser(email string, key crypto.PrivateKey) *MyUser {
 
 // GetEmail returns the user's email address for ACME registration.
 // This method is required by the ACME user interface for account identification.
-// Moved from: utils.go
 func (u *MyUser) GetEmail() string {
 	return u.Email
 }
 
 // GetRegistration returns the user's ACME registration resource.
 // Contains registration details and account information from the ACME server.
-// Moved from: utils.go
 func (u MyUser) GetRegistration() *registration.Resource {
 	return u.Registration
 }
 
 // GetPrivateKey returns the user's private key for ACME operations.
 // Used for signing ACME requests and certificate generation processes.
-// Moved from: utils.go
 func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
 	return u.key
 }

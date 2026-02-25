@@ -1,7 +1,6 @@
 package reseed
 
 // SharedUtilities provides common utility functions used across the reseed package.
-// Moved from: various files
 
 import (
 	"strings"

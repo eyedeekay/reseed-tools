@@ -5,7 +5,7 @@ I2P Reseed Tools
 
 This tool provides a secure and efficient reseed server for the I2P network.
 There are several utility commands to create, sign, and validate SU3 files.
-Please note that this requires at least Go version 1.13, and uses Go Modules.
+Please note that this requires at least Go version 1.24, and uses Go Modules.
 
 Standard reseeds are distributed with the I2P packages. To get your reseed
 included, apply on [i2pforum.i2p](http://i2pforum.i2p).
@@ -32,7 +32,7 @@ to configure your signing keys/contact info.
 ### Installation(From Source)
 
 ```
-git clone https://i2pgit.org/idk/reseed-tools
+git clone https://i2pgit.org/go-i2p/reseed-tools
 cd reseed-tools
 make build
 # Optionally, if you want to install to /usr/bin/reseed-tools

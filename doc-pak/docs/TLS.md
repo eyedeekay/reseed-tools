@@ -42,7 +42,7 @@ To automate this process using an ACME CA, like Let's Encrypt, you can use the `
 Be sure to change the `--acmeserver` option in order to use a **production** ACME server, as
 the software defaults to a **staging** ACME server for testing purposes.
 
-This functionality is new and may have issues. Please file bug reports at (i2pgit)[https://i2pgit.org/idk/reseed-tools) or [github](https://github.com/go-i2p/reseed-tools).
+This functionality is new and may have issues. Please file bug reports at [i2pgit](https://i2pgit.org/go-i2p/reseed-tools) or [github](https://github.com/go-i2p/reseed-tools).
 
 ```sh
 

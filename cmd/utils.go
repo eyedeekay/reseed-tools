@@ -45,11 +45,8 @@ func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	return privKey, nil
 }
 
-// MyUser struct and methods moved to myuser.go
-
 // signerFile creates a filename-safe version of a signer ID.
 // This function provides consistent filename generation across the cmd package.
-// Moved from: inline implementations
 func signerFile(signerID string) string {
 	return strings.Replace(signerID, "@", "_at_", 1)
 }

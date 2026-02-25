@@ -21,8 +21,6 @@ import (
 	"github.com/throttled/throttled/v2/store"
 )
 
-// Constants moved to constants.go
-
 // Server represents a complete reseed server instance with multi-protocol support.
 // It provides HTTP/HTTPS reseed services over clearnet, I2P, and Tor networks with
 // rate limiting, blacklisting, and comprehensive security features for distributing
@@ -94,10 +92,6 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	return &server
 }
 
-// See use of crypto/rand on:
-// https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
-// Constants moved to constants.go
-
 // SecureRandomAlphaString generates a cryptographically secure random alphabetic string.
 // Returns a 16-character string using only letters for use in tokens, session IDs, and
 // other security-sensitive contexts. Uses crypto/rand for entropy source.
@@ -134,8 +128,8 @@ func SecureRandomBytes(length int) []byte {
 	return randomBytes
 }
 
-//
-
+// Address returns a string representation of all active listener addresses
+// (TCP, I2P, Onion) for this server instance.
 func (srv *Server) Address() string {
 	addrs := make(map[string]string)
 	if srv.I2PListener != nil {
@@ -150,6 +144,8 @@ func (srv *Server) Address() string {
 	return fmt.Sprintf("%v", addrs)
 }
 
+// Acceptable generates a one-time token for browser-based reseed requests.
+// Tokens expire after 4 minutes. The token pool is capped at 50 entries.
 func (srv *Server) Acceptable() string {
 	srv.acceptablesMutex.Lock()
 	defer srv.acceptablesMutex.Unlock()
@@ -171,6 +167,9 @@ func (srv *Server) Acceptable() string {
 	return acceptme
 }
 
+// CheckAcceptable validates and consumes a one-time token. Returns true if the
+// token exists and was generated within the last 4 minutes; false otherwise.
+// The token is deleted after use regardless of validity.
 func (srv *Server) CheckAcceptable(val string) bool {
 	srv.acceptablesMutex.Lock()
 	defer srv.acceptablesMutex.Unlock()

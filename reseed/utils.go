@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-// KeyStore struct and methods moved to keystore.go
-
 // SignerFilename generates a certificate filename from a signer ID string.
 // Appends ".crt" extension to the processed signer ID for consistent certificate file naming.
 // Uses SignerFilenameFromID for consistent ID processing across the reseed system.

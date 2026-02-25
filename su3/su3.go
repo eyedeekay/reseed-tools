@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-// Constants moved to constants.go
-
 // File represents a complete SU3 file structure for I2P software distribution.
 // SU3 files are cryptographically signed containers used to distribute router updates,
 // plugins, reseed data, and other I2P network components. Each file contains metadata,

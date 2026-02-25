@@ -1,7 +1,6 @@
 package su3
 
 // SU3 File format constants
-// Moved from: su3.go
 const (
 	// minVersionLength specifies the minimum required length for version fields in SU3 files.
 	// Version fields shorter than this will be zero-padded to meet the requirement.

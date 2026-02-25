@@ -1,7 +1,7 @@
 Using a remote Network Database
 ===============================
 
-Beginning in `reseed-tools 2.5.0` it is possible to use reseed-tools to "share" a netDb directory on one host with a reseed server on another host.
+Beginning in `reseed-tools 0.2.5` it is possible to use reseed-tools to "share" a netDb directory on one host with a reseed server on another host.
 This feature is built into the reseed-tools software.
 It is also possible to do this manually using `sshfs`, `ssh` combined with `cron`, and most available backup utilities like `borg` and `syncthing`.
 This guide only covers `reseed-tools`.

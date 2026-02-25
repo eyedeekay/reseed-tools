@@ -89,8 +89,6 @@ func PingWriteContent(urlInput string) error {
 	return nil
 }
 
-// AllReseeds moved to shared_utils.go
-
 func yday() time.Time {
 	// Calculate yesterday's date for rate limiting ping operations
 	today := time.Now()

@@ -12,6 +12,8 @@ import (
 
 var lgr = logger.GetGoI2PLogger()
 
+// ListenAndServe starts the server on the configured address using plain HTTP
+// with blacklist filtering on incoming connections.
 func (srv *Server) ListenAndServe() error {
 	addr := srv.Addr
 	if addr == "" {
@@ -25,6 +27,8 @@ func (srv *Server) ListenAndServe() error {
 	return srv.Serve(newBlacklistListener(ln, srv.Blacklist))
 }
 
+// ListenAndServeTLS starts the server using HTTPS with the provided certificate
+// and key files, applying blacklist filtering on incoming connections.
 func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 	addr := srv.Addr
 	if addr == "" {
@@ -55,6 +59,8 @@ func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 	return srv.Serve(tlsListener)
 }
 
+// ListenAndServeOnionTLS starts the server as a Tor onion v3 hidden service
+// with TLS encryption.
 func (srv *Server) ListenAndServeOnionTLS(startConf *tor.StartConf, listenConf *tor.ListenConf, certFile, keyFile string) error {
 	lgr.WithField("service", "onionv3-https").Debug("Starting and registering OnionV3 HTTPS service, please wait a couple of minutes...")
 	var err error
@@ -71,6 +77,8 @@ func (srv *Server) ListenAndServeOnionTLS(startConf *tor.StartConf, listenConf *
 	return srv.Serve(srv.OnionListener)
 }
 
+// ListenAndServeOnion starts the server as a Tor onion v3 hidden service
+// using plain HTTP.
 func (srv *Server) ListenAndServeOnion(startConf *tor.StartConf, listenConf *tor.ListenConf) error {
 	lgr.WithField("service", "onionv3-http").Debug("Starting and registering OnionV3 HTTP service, please wait a couple of minutes...")
 	var err error
@@ -87,6 +95,8 @@ func (srv *Server) ListenAndServeOnion(startConf *tor.StartConf, listenConf *tor
 	return srv.Serve(srv.OnionListener)
 }
 
+// ListenAndServeI2PTLS starts the server as an I2P hidden service with TLS
+// encryption, connecting through the SAM bridge at the given address.
 func (srv *Server) ListenAndServeI2PTLS(samaddr string, I2PKeys i2pkeys.I2PKeys, certFile, keyFile string) error {
 	lgr.WithField("service", "i2p-https").WithField("sam_address", samaddr).Debug("Starting and registering I2P HTTPS service, please wait a couple of minutes...")
 	var err error
@@ -102,6 +112,8 @@ func (srv *Server) ListenAndServeI2PTLS(samaddr string, I2PKeys i2pkeys.I2PKeys,
 	return srv.Serve(srv.I2PListener)
 }
 
+// ListenAndServeI2P starts the server as an I2P hidden service using plain HTTP,
+// connecting through the SAM bridge at the given address.
 func (srv *Server) ListenAndServeI2P(samaddr string, I2PKeys i2pkeys.I2PKeys) error {
 	lgr.WithField("service", "i2p-http").WithField("sam_address", samaddr).Debug("Starting and registering I2P service, please wait a couple of minutes...")
 	var err error

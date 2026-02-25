@@ -23,7 +23,7 @@ ExecStart=/usr/bin/reseed-tools reseed --yes=true --netdb=/var/lib/i2p/i2p-confi
 to disable self-signed certificate generation.
 
 - To enable starting the reseed service automatically with the system: `sudo systemctl enable reseed.service`
-- To run the service manually: `sudo sysctl start reseed.service`  
+- To run the service manually: `sudo systemctl start reseed.service`  
 - To reload the systemd services: `sudo systemctl daemon-reload`
 - To view the status/logs: `sudo journalctl -u reseed.service`
 
@@ -34,7 +34,7 @@ cannot schedule itself to restart. You should restart the service roughly once
 a day to ensure that the information does not expire.
 
 The contact email for your reseed should be added in:
-`/etc/init.d/reseed`.
+`/etc/default/reseed`.
 
 Self-signed certificates will be auto-generated for these services.
 To change this you should edit the `/etc/default/reseed`.

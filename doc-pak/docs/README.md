@@ -43,14 +43,14 @@ sudo apt-get install fakeroot checkinstall go git make
 
 ```sh
 
-git clone https://i2pgit.org/idk/reseed-tools ~/go/src/i2pgit.org/idk/reseed-tools
+git clone https://i2pgit.org/go-i2p/reseed-tools ~/go/src/i2pgit.org/go-i2p/reseed-tools
 ```
 
 \\**3.** Generate the `.deb` package using the `make checkinstall` target
 
 ```sh
 
-cd ~/go/src/i2pgit.org/idk/reseed-tools
+cd ~/go/src/i2pgit.org/go-i2p/reseed-tools
 make checkinstall
 ```
 

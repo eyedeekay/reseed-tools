@@ -83,6 +83,9 @@ func NewReseeder(netdb *LocalNetDbImpl) *ReseederImpl {
 	return rs
 }
 
+// Start begins the reseed service, performing an initial SU3 cache build and
+// starting a background goroutine that periodically rebuilds the cache at
+// RebuildInterval. Returns a channel that can be closed to stop the rebuild loop.
 func (rs *ReseederImpl) Start() chan bool {
 	// No need for atomic swapper - atomic.Value handles concurrency
 
@@ -225,6 +228,9 @@ func (rs *ReseederImpl) su3Builder(in <-chan []routerInfo) <-chan *su3.File {
 	return out
 }
 
+// PeerSu3Bytes returns a pre-built SU3 file selected deterministically based on
+// the peer's hash. This ensures the same peer consistently receives the same
+// reseed bundle within a rebuild cycle.
 func (rs *ReseederImpl) PeerSu3Bytes(peer Peer) ([]byte, error) {
 	m := rs.su3s.Load().([][]byte)
 
