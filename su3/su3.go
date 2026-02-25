@@ -3,6 +3,8 @@ package su3
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -63,53 +65,147 @@ func New() *File {
 	}
 }
 
-// Sign cryptographically signs the SU3 file using the provided RSA private key.
-// The signature covers the file header and content but not the signature itself.
-// The signature length is automatically determined by the RSA key size.
-// Returns an error if the private key is nil or signature generation fails.
-func (s *File) Sign(privkey *rsa.PrivateKey) error {
+// Sign cryptographically signs the SU3 file using the provided private key.
+// The key must implement crypto.Signer (e.g. *rsa.PrivateKey, *ecdsa.PrivateKey).
+// The key type must match the declared SignatureType — RSA keys for RSA signature
+// types, ECDSA keys for ECDSA signature types. The signature covers the file
+// header and content but not the signature itself.
+// Returns an error if the key is nil, the key/type combination is invalid,
+// or signature generation fails.
+func (s *File) Sign(privkey crypto.Signer) error {
 	if privkey == nil {
 		lgr.Error("Private key cannot be nil for SU3 signing")
 		return fmt.Errorf("private key cannot be nil")
 	}
 
-	// Pre-calculate signature length to ensure header consistency
-	// This temporary signature ensures BodyBytes() generates correct metadata
-	keySize := privkey.Size()           // Returns key size in bytes
-	s.Signature = make([]byte, keySize) // Temporary signature with correct length
-
+	// Validate that the key type matches the declared SignatureType and
+	// select the appropriate hash algorithm.
 	var hashType crypto.Hash
-	// Select appropriate hash algorithm based on signature type
-	// Different signature types require specific hash functions for security
 	switch s.SignatureType {
 	case SigTypeDSA:
-		hashType = crypto.SHA1
-	case SigTypeECDSAWithSHA256, SigTypeRSAWithSHA256:
+		return fmt.Errorf("DSA signing is not supported")
+	case SigTypeECDSAWithSHA256:
+		if err := validateECDSAKey(privkey, elliptic.P256()); err != nil {
+			return err
+		}
 		hashType = crypto.SHA256
-	case SigTypeECDSAWithSHA384, SigTypeRSAWithSHA384:
+	case SigTypeECDSAWithSHA384:
+		if err := validateECDSAKey(privkey, elliptic.P384()); err != nil {
+			return err
+		}
 		hashType = crypto.SHA384
-	case SigTypeECDSAWithSHA512, SigTypeRSAWithSHA512:
+	case SigTypeECDSAWithSHA512:
+		if err := validateECDSAKey(privkey, elliptic.P521()); err != nil {
+			return err
+		}
+		hashType = crypto.SHA512
+	case SigTypeRSAWithSHA256:
+		if err := validateRSAKey(privkey); err != nil {
+			return err
+		}
+		hashType = crypto.SHA256
+	case SigTypeRSAWithSHA384:
+		if err := validateRSAKey(privkey); err != nil {
+			return err
+		}
+		hashType = crypto.SHA384
+	case SigTypeRSAWithSHA512:
+		if err := validateRSAKey(privkey); err != nil {
+			return err
+		}
 		hashType = crypto.SHA512
 	default:
 		lgr.WithField("signature_type", s.SignatureType).Error("Unknown signature type for SU3 signing")
 		return fmt.Errorf("unknown signature type: %d", s.SignatureType)
 	}
 
+	// Pre-calculate signature length so BodyBytes() generates a correct header.
+	// For ECDSA, we use a fixed canonical length per curve so the header is
+	// deterministic. The actual DER signature will be zero-padded to this length.
+	switch key := privkey.(type) {
+	case *rsa.PrivateKey:
+		s.Signature = make([]byte, key.Size())
+	case *ecdsa.PrivateKey:
+		s.Signature = make([]byte, ecdsaCanonicalSigLen(key))
+	default:
+		return fmt.Errorf("unsupported key type: %T", privkey)
+	}
+
 	h := hashType.New()
 	h.Write(s.BodyBytes())
 	digest := h.Sum(nil)
 
-	// Generate RSA signature using PKCS#1 v1.5 padding scheme
-	// The hash type is already applied, so we pass 0 to indicate pre-hashed data
-	sig, err := rsa.SignPKCS1v15(rand.Reader, privkey, 0, digest)
-	if nil != err {
-		lgr.WithError(err).Error("Failed to generate RSA signature for SU3 file")
-		return err
+	// Dispatch signing based on key type
+	switch key := privkey.(type) {
+	case *rsa.PrivateKey:
+		// Generate RSA signature using PKCS#1 v1.5 padding scheme
+		// The hash type is already applied, so we pass 0 to indicate pre-hashed data
+		sig, err := rsa.SignPKCS1v15(rand.Reader, key, 0, digest)
+		if err != nil {
+			lgr.WithError(err).Error("Failed to generate RSA signature for SU3 file")
+			return err
+		}
+		s.Signature = sig
+	case *ecdsa.PrivateKey:
+		// Generate ECDSA signature as ASN.1 DER-encoded (R, S) pair
+		sig, err := ecdsa.SignASN1(rand.Reader, key, digest)
+		if err != nil {
+			lgr.WithError(err).Error("Failed to generate ECDSA signature for SU3 file")
+			return err
+		}
+		// Pad the DER-encoded signature to the canonical length so the
+		// signatureLength header field is consistent between signing and
+		// verification. asn1.Unmarshal will correctly parse the DER prefix
+		// and ignore trailing zero-padding.
+		canonLen := ecdsaCanonicalSigLen(key)
+		if len(sig) > canonLen {
+			return fmt.Errorf("ECDSA signature length %d exceeds canonical max %d", len(sig), canonLen)
+		}
+		padded := make([]byte, canonLen)
+		copy(padded, sig)
+		s.Signature = padded
+	default:
+		return fmt.Errorf("unsupported key type for signing: %T", privkey)
 	}
 
-	s.Signature = sig
-
 	return nil
+}
+
+// validateRSAKey checks that privkey is an *rsa.PrivateKey.
+func validateRSAKey(privkey crypto.Signer) error {
+	if _, ok := privkey.(*rsa.PrivateKey); !ok {
+		return fmt.Errorf("RSA signature type requires *rsa.PrivateKey, got %T", privkey)
+	}
+	return nil
+}
+
+// validateECDSAKey checks that privkey is an *ecdsa.PrivateKey on the expected curve.
+func validateECDSAKey(privkey crypto.Signer, expectedCurve elliptic.Curve) error {
+	ecKey, ok := privkey.(*ecdsa.PrivateKey)
+	if !ok {
+		return fmt.Errorf("ECDSA signature type requires *ecdsa.PrivateKey, got %T", privkey)
+	}
+	if ecKey.Curve != expectedCurve {
+		return fmt.Errorf("ECDSA key curve mismatch: expected %s, got %s",
+			expectedCurve.Params().Name, ecKey.Curve.Params().Name)
+	}
+	return nil
+}
+
+// ecdsaCanonicalSigLen returns the fixed canonical signature length for the
+// given ECDSA key's curve. ECDSA DER signatures are variable-length, but
+// we use a fixed maximum per curve so the SU3 header signatureLength field
+// is deterministic. Actual signatures are zero-padded to this length.
+func ecdsaCanonicalSigLen(key *ecdsa.PrivateKey) int {
+	// DER encoding: SEQUENCE { INTEGER r, INTEGER s }
+	// Each integer: at most (orderLen + 1) bytes (sign padding) + 2 bytes tag+length
+	// Sequence overhead: 2 bytes if content ≤ 127, 3 bytes otherwise
+	orderLen := (key.Curve.Params().BitSize + 7) / 8
+	contentLen := 2*(orderLen+1) + 4 // two integers with tag+length
+	if contentLen > 127 {
+		return 3 + contentLen // long-form SEQUENCE length
+	}
+	return 2 + contentLen // short-form SEQUENCE length
 }
 
 // BodyBytes generates the binary representation of the SU3 file without the signature.
@@ -129,18 +225,45 @@ func (s *File) BodyBytes() []byte {
 		contentLength   = uint64(len(s.Content))
 	)
 
-	// Calculate signature length based on algorithm and available signature data
-	// Different signature types have different length requirements for proper verification
+	// Calculate signature length based on algorithm and available signature data.
+	// For RSA, signature length is fixed by key size. For ECDSA, we use
+	// canonical fixed lengths per curve (actual DER signatures are zero-padded).
+	// When s.Signature is already populated (e.g. after Sign or UnmarshalBinary),
+	// use its actual length to ensure header consistency.
 	switch s.SignatureType {
 	case SigTypeDSA:
 		signatureLength = uint16(40)
-	case SigTypeECDSAWithSHA256, SigTypeRSAWithSHA256:
-		signatureLength = uint16(256)
-	case SigTypeECDSAWithSHA384, SigTypeRSAWithSHA384:
-		signatureLength = uint16(384)
-	case SigTypeECDSAWithSHA512, SigTypeRSAWithSHA512:
-		// For RSA, signature length depends on key size, not hash algorithm
-		// Use actual signature length if available, otherwise default to 2048-bit RSA
+	case SigTypeECDSAWithSHA256:
+		if len(s.Signature) > 0 {
+			signatureLength = uint16(len(s.Signature))
+		} else {
+			signatureLength = uint16(72) // Canonical max for P-256 DER
+		}
+	case SigTypeECDSAWithSHA384:
+		if len(s.Signature) > 0 {
+			signatureLength = uint16(len(s.Signature))
+		} else {
+			signatureLength = uint16(104) // Canonical max for P-384 DER
+		}
+	case SigTypeECDSAWithSHA512:
+		if len(s.Signature) > 0 {
+			signatureLength = uint16(len(s.Signature))
+		} else {
+			signatureLength = uint16(141) // Canonical max for P-521 DER
+		}
+	case SigTypeRSAWithSHA256:
+		if len(s.Signature) > 0 {
+			signatureLength = uint16(len(s.Signature))
+		} else {
+			signatureLength = uint16(256) // Default for 2048-bit RSA key
+		}
+	case SigTypeRSAWithSHA384:
+		if len(s.Signature) > 0 {
+			signatureLength = uint16(len(s.Signature))
+		} else {
+			signatureLength = uint16(384) // Default for 3072-bit RSA key
+		}
+	case SigTypeRSAWithSHA512:
 		if len(s.Signature) > 0 {
 			signatureLength = uint16(len(s.Signature))
 		} else {

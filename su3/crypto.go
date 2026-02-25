@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/dsa"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -201,4 +202,68 @@ func NewSigningCertificate(signerID string, privateKey *rsa.PrivateKey) ([]byte,
 	}
 
 	return cert, nil
+}
+
+// NewECDSASigningCertificate creates a self-signed X.509 certificate for SU3 file signing
+// using an ECDSA private key. It generates a certificate with the specified signer ID
+// for use in I2P reseed operations. The certificate is valid for 10 years and includes
+// proper key usage extensions for digital signatures.
+func NewECDSASigningCertificate(signerID string, privateKey *ecdsa.PrivateKey) ([]byte, error) {
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	var subjectKeyId []byte
+	isCA := true
+	if signerID != "" {
+		subjectKeyId = []byte(signerID)
+	} else {
+		subjectKeyId = []byte("")
+		isCA = false
+	}
+
+	template := &x509.Certificate{
+		BasicConstraintsValid: true,
+		IsCA:                  isCA,
+		SubjectKeyId:          subjectKeyId,
+		SerialNumber:          serialNumber,
+		Subject: pkix.Name{
+			Organization:       []string{"I2P Anonymous Network"},
+			OrganizationalUnit: []string{"I2P"},
+			Locality:           []string{"XX"},
+			StreetAddress:      []string{"XX"},
+			Country:            []string{"XX"},
+			CommonName:         signerID,
+		},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().AddDate(10, 0, 0),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+	}
+
+	publicKey := &privateKey.PublicKey
+	parent := template
+	cert, err := x509.CreateCertificate(rand.Reader, template, parent, publicKey, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert, nil
+}
+
+// ecdsaCurveForSignatureType returns the appropriate elliptic curve for the
+// given ECDSA signature type constant. Returns nil for non-ECDSA types.
+func ECDSACurveForSignatureType(sigType uint16) elliptic.Curve {
+	switch sigType {
+	case SigTypeECDSAWithSHA256:
+		return elliptic.P256()
+	case SigTypeECDSAWithSHA384:
+		return elliptic.P384()
+	case SigTypeECDSAWithSHA512:
+		return elliptic.P521()
+	default:
+		return nil
+	}
 }

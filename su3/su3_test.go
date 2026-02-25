@@ -2,6 +2,9 @@ package su3
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -35,6 +38,7 @@ func TestFile_Sign(t *testing.T) {
 	tests := []struct {
 		name          string
 		signatureType uint16
+		key           crypto.Signer
 		expectError   bool
 	}{
 		{
@@ -72,7 +76,11 @@ func TestFile_Sign(t *testing.T) {
 			file.Content = []byte("test content")
 			file.SignerID = []byte("test@example.com")
 
-			err := file.Sign(privateKey)
+			var key crypto.Signer = privateKey
+			if tt.key != nil {
+				key = tt.key
+			}
+			err := file.Sign(key)
 
 			if tt.expectError {
 				if err == nil {
@@ -100,6 +108,118 @@ func TestFile_Sign_NilPrivateKey(t *testing.T) {
 	err := file.Sign(nil)
 	if err == nil {
 		t.Error("Expected error when signing with nil private key")
+	}
+}
+
+func TestFile_Sign_ECDSA(t *testing.T) {
+	tests := []struct {
+		name          string
+		signatureType uint16
+		curve         elliptic.Curve
+		expectError   bool
+	}{
+		{
+			name:          "ECDSA P-256 with SHA256",
+			signatureType: SigTypeECDSAWithSHA256,
+			curve:         elliptic.P256(),
+			expectError:   false,
+		},
+		{
+			name:          "ECDSA P-384 with SHA384",
+			signatureType: SigTypeECDSAWithSHA384,
+			curve:         elliptic.P384(),
+			expectError:   false,
+		},
+		{
+			name:          "ECDSA P-521 with SHA512",
+			signatureType: SigTypeECDSAWithSHA512,
+			curve:         elliptic.P521(),
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ecKey, err := ecdsa.GenerateKey(tt.curve, rand.Reader)
+			if err != nil {
+				t.Fatalf("Failed to generate ECDSA key: %v", err)
+			}
+
+			file := New()
+			file.SignatureType = tt.signatureType
+			file.Content = []byte("test content for ECDSA")
+			file.SignerID = []byte("ecdsa-test@example.com")
+
+			err = file.Sign(ecKey)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(file.Signature) == 0 {
+				t.Error("Signature should be set after signing")
+			}
+		})
+	}
+}
+
+func TestFile_Sign_KeyTypeMismatch(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key: %v", err)
+	}
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		signatureType uint16
+		key           crypto.Signer
+	}{
+		{"RSA key with ECDSA type", SigTypeECDSAWithSHA256, rsaKey},
+		{"ECDSA key with RSA type", SigTypeRSAWithSHA256, ecKey},
+		{"ECDSA P-256 key with P-384 type", SigTypeECDSAWithSHA384, ecKey},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := New()
+			file.SignatureType = tt.signatureType
+			file.Content = []byte("test")
+			file.SignerID = []byte("test@example.com")
+
+			err := file.Sign(tt.key)
+			if err == nil {
+				t.Error("Expected error for key/type mismatch but got none")
+			}
+		})
+	}
+}
+
+func TestFile_Sign_DSAUnsupported(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key: %v", err)
+	}
+
+	file := New()
+	file.SignatureType = SigTypeDSA
+	file.Content = []byte("test")
+	file.SignerID = []byte("test@example.com")
+
+	err = file.Sign(rsaKey)
+	if err == nil {
+		t.Error("Expected error for DSA signing but got none")
 	}
 }
 
@@ -537,5 +657,132 @@ func BenchmarkFile_UnmarshalBinary(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		newFile := &File{}
 		_ = newFile.UnmarshalBinary(data)
+	}
+}
+
+func TestFile_ECDSA_RoundTrip(t *testing.T) {
+	tests := []struct {
+		name          string
+		signatureType uint16
+		curve         elliptic.Curve
+	}{
+		{"ECDSA P-256 SHA256", SigTypeECDSAWithSHA256, elliptic.P256()},
+		{"ECDSA P-384 SHA384", SigTypeECDSAWithSHA384, elliptic.P384()},
+		{"ECDSA P-521 SHA512", SigTypeECDSAWithSHA512, elliptic.P521()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Generate ECDSA key
+			ecKey, err := ecdsa.GenerateKey(tt.curve, rand.Reader)
+			if err != nil {
+				t.Fatalf("Failed to generate ECDSA key: %v", err)
+			}
+
+			// Create certificate
+			certDER, err := NewECDSASigningCertificate("ecdsa-roundtrip@example.com", ecKey)
+			if err != nil {
+				t.Fatalf("Failed to create ECDSA certificate: %v", err)
+			}
+			parsedCert, err := x509.ParseCertificate(certDER)
+			if err != nil {
+				t.Fatalf("Failed to parse certificate: %v", err)
+			}
+
+			// Create, sign, marshal, unmarshal, verify
+			originalFile := New()
+			originalFile.SignatureType = tt.signatureType
+			originalFile.FileType = FileTypeZIP
+			originalFile.ContentType = ContentTypeReseed
+			originalFile.Content = []byte("ECDSA round-trip test content")
+			originalFile.SignerID = []byte("ecdsa-roundtrip@example.com")
+
+			err = originalFile.Sign(ecKey)
+			if err != nil {
+				t.Fatalf("Failed to sign file: %v", err)
+			}
+
+			data, err := originalFile.MarshalBinary()
+			if err != nil {
+				t.Fatalf("Failed to marshal file: %v", err)
+			}
+
+			newFile := &File{}
+			err = newFile.UnmarshalBinary(data)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal file: %v", err)
+			}
+
+			// Verify signature
+			err = newFile.VerifySignature(parsedCert)
+			if err != nil {
+				t.Fatalf("Failed to verify ECDSA signature after round-trip: %v", err)
+			}
+
+			// Verify content matches
+			if !bytes.Equal(originalFile.Content, newFile.Content) {
+				t.Error("Content doesn't match after round-trip")
+			}
+
+			if !bytes.Equal(originalFile.SignerID, newFile.SignerID) {
+				t.Error("SignerID doesn't match after round-trip")
+			}
+
+			if newFile.SignatureType != tt.signatureType {
+				t.Errorf("SignatureType mismatch: expected %d, got %d", tt.signatureType, newFile.SignatureType)
+			}
+		})
+	}
+}
+
+func TestFile_ECDSA_VerifySignature(t *testing.T) {
+	tests := []struct {
+		name          string
+		signatureType uint16
+		curve         elliptic.Curve
+	}{
+		{"ECDSA P-256 SHA256", SigTypeECDSAWithSHA256, elliptic.P256()},
+		{"ECDSA P-384 SHA384", SigTypeECDSAWithSHA384, elliptic.P384()},
+		{"ECDSA P-521 SHA512", SigTypeECDSAWithSHA512, elliptic.P521()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ecKey, err := ecdsa.GenerateKey(tt.curve, rand.Reader)
+			if err != nil {
+				t.Fatalf("Failed to generate ECDSA key: %v", err)
+			}
+
+			certDER, err := NewECDSASigningCertificate("verify-test@example.com", ecKey)
+			if err != nil {
+				t.Fatalf("Failed to create ECDSA certificate: %v", err)
+			}
+			parsedCert, err := x509.ParseCertificate(certDER)
+			if err != nil {
+				t.Fatalf("Failed to parse certificate: %v", err)
+			}
+
+			file := New()
+			file.SignatureType = tt.signatureType
+			file.Content = []byte("ECDSA verify test")
+			file.SignerID = []byte("verify-test@example.com")
+
+			err = file.Sign(ecKey)
+			if err != nil {
+				t.Fatalf("Failed to sign file: %v", err)
+			}
+
+			err = file.VerifySignature(parsedCert)
+			if err != nil {
+				t.Errorf("ECDSA signature verification failed: %v", err)
+			}
+
+			// Tamper with content and verify failure
+			file.Content = []byte("tampered content")
+			err = file.VerifySignature(parsedCert)
+			if err == nil {
+				t.Error("Expected verification failure after content tampering")
+			}
+		})
 	}
 }
