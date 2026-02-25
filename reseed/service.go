@@ -320,7 +320,7 @@ func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 		}
 	}
 
-	return
+	return routerInfos, err
 }
 
 // fanIn multiplexes multiple SU3 file channels into a single output channel.

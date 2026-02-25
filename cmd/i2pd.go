@@ -3,7 +3,7 @@
 
 package cmd
 
-//i2pd "github.com/eyedeekay/go-i2pd/goi2pd"
+// i2pd "github.com/eyedeekay/go-i2pd/goi2pd"
 
 // DEPRECATED AND REMOVED. We will replace this with a go-i2p router very soon.
 

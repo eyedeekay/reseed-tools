@@ -159,12 +159,12 @@ func TestNilPointerDereferenceTLSRenewal(t *testing.T) {
 	keyFile := "test-key.pem"
 
 	// Write certificate and key to files
-	if err := os.WriteFile(certFile, cert, 0644); err != nil {
+	if err := os.WriteFile(certFile, cert, 0o644); err != nil {
 		t.Fatalf("Failed to write cert file: %v", err)
 	}
 	defer os.Remove(certFile)
 
-	if err := os.WriteFile(keyFile, key, 0644); err != nil {
+	if err := os.WriteFile(keyFile, key, 0o644); err != nil {
 		t.Fatalf("Failed to write key file: %v", err)
 	}
 	defer os.Remove(keyFile)
@@ -261,12 +261,12 @@ func TestCertificateLeafParsingFix(t *testing.T) {
 	certFile := "test-cert-fix.pem"
 	keyFile := "test-key-fix.pem"
 
-	if err := os.WriteFile(certFile, cert, 0644); err != nil {
+	if err := os.WriteFile(certFile, cert, 0o644); err != nil {
 		t.Fatalf("Failed to write cert file: %v", err)
 	}
 	defer os.Remove(certFile)
 
-	if err := os.WriteFile(keyFile, key, 0644); err != nil {
+	if err := os.WriteFile(keyFile, key, 0o644); err != nil {
 		t.Fatalf("Failed to write key file: %v", err)
 	}
 	defer os.Remove(keyFile)

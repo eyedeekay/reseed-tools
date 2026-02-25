@@ -245,7 +245,7 @@ func TestRouterAgeDefaultConsistency(t *testing.T) {
 
 	// Test that when we use the documented default (72h), it works as expected
 	netdb := NewLocalNetDb(tempDir, defaultAge)
-	
+
 	if netdb.MaxRouterInfoAge != defaultAge {
 		t.Errorf("Expected MaxRouterInfoAge to be %v (I2P standard), got %v", defaultAge, netdb.MaxRouterInfoAge)
 	}
