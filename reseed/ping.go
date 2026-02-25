@@ -2,13 +2,22 @@ package reseed
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
+
+// pingClient is a dedicated HTTP client for ping operations with a reasonable timeout.
+// Using http.DefaultClient has no timeout and can cause goroutine leaks when servers
+// are unresponsive. A 30-second timeout balances reliability with resource safety.
+var pingClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 // Ping tests the availability of a reseed server by requesting an SU3 file.
 // It appends "i2pseeds.su3" to the URL if not present and validates the server response.
@@ -27,8 +36,8 @@ func Ping(urlInput string) (bool, error) {
 	}
 	req.Header.Set("User-Agent", I2pUserAgent)
 
-	// Execute request and check for successful response
-	resp, err := http.DefaultClient.Do(req)
+	// Execute request using dedicated client with timeout to prevent goroutine leaks
+	resp, err := pingClient.Do(req)
 	if err != nil {
 		return false, err
 	}
@@ -89,21 +98,32 @@ func yday() time.Time {
 	return yesterday
 }
 
+// pingMu protects lastPing from concurrent read/write access.
+// Without synchronization, concurrent HTTP requests triggering PingEverybody()
+// can race on the time.Time value, bypassing rate limiting or corrupting timestamps.
+var pingMu sync.Mutex
+
 // lastPing tracks the timestamp of the last successful ping operation for rate limiting.
 // This prevents excessive server polling by ensuring ping operations only occur once
 // per 24-hour period, respecting reseed server resources and network bandwidth.
+// Access must be protected by pingMu.
 var lastPing = yday()
 
 // PingEverybody tests all known reseed servers and returns their status results.
 // Implements rate limiting to prevent excessive pinging (once per 24 hours) and
 // returns a slice of status strings indicating success or failure for each server.
+// Thread-safe: uses pingMu to synchronize access to lastPing.
 func PingEverybody() []string {
+	pingMu.Lock()
 	// Enforce rate limiting to prevent server abuse
 	if lastPing.After(yday()) {
+		pingMu.Unlock()
 		lgr.Debug("Your ping was rate-limited")
 		return nil
 	}
 	lastPing = time.Now()
+	pingMu.Unlock()
+
 	var nonerrs []string
 	// Test each reseed server and collect results for display
 	for _, urlInput := range AllReseeds {
@@ -143,6 +163,7 @@ func GetPingFiles() ([]string, error) {
 // ReadOut writes HTML-formatted ping status information to the HTTP response.
 // Displays the current status of all known reseed servers in a user-friendly format
 // for the web interface, including warnings about experimental nature of the feature.
+// All dynamic content is HTML-escaped to prevent injection from ping result data.
 func ReadOut(w http.ResponseWriter) {
 	pinglist, err := GetPingFiles()
 	if err == nil {
@@ -155,9 +176,9 @@ func ReadOut(w http.ResponseWriter) {
 			host := strings.Replace(file, ".ping", "", 1)
 			host = filepath.Base(host)
 			if err == nil {
-				fmt.Fprintf(w, "<li><strong>%s</strong> - %s</li>\n", host, ping)
+				fmt.Fprintf(w, "<li><strong>%s</strong> - %s</li>\n", html.EscapeString(host), html.EscapeString(string(ping)))
 			} else {
-				fmt.Fprintf(w, "<li><strong>%s</strong> - No ping file found</li>\n", host)
+				fmt.Fprintf(w, "<li><strong>%s</strong> - No ping file found</li>\n", html.EscapeString(host))
 			}
 		}
 		fmt.Fprintf(w, "</ul></p></div>")
