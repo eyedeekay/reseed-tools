@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"archive/tar"
+	"bytes"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -82,12 +85,15 @@ func TestWalker(t *testing.T) {
 	testFile1 := filepath.Join(tempDir, "routerInfo-test1.dat")
 	testFile2 := filepath.Join(tempDir, "routerInfo-test2.dat")
 
-	err = os.WriteFile(testFile1, []byte("test router info 1"), 0o644)
+	testContent1 := []byte("test router info 1")
+	testContent2 := []byte("test router info 2")
+
+	err = os.WriteFile(testFile1, testContent1, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file 1: %v", err)
 	}
 
-	err = os.WriteFile(testFile2, []byte("test router info 2"), 0o644)
+	err = os.WriteFile(testFile2, testContent2, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file 2: %v", err)
 	}
@@ -104,6 +110,55 @@ func TestWalker(t *testing.T) {
 
 	if result.Len() == 0 {
 		t.Error("walker() returned empty buffer")
+	}
+
+	// Verify the tar archive is valid and properly finalized by reading it back
+	tr := tar.NewReader(bytes.NewReader(result.Bytes()))
+	filesFound := make(map[string][]byte)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break // Properly terminated archive
+		}
+		if err != nil {
+			t.Fatalf("tar.Reader.Next() failed — archive may be malformed (missing tw.Close): %v", err)
+		}
+		content, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatalf("failed to read tar entry %s: %v", header.Name, err)
+		}
+		filesFound[header.Name] = content
+	}
+
+	if len(filesFound) != 2 {
+		t.Errorf("expected 2 files in archive, got %d", len(filesFound))
+	}
+}
+
+func TestWalker_EmptyDirectory(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "netdb_walker_empty")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	result, err := walker(tempDir)
+	if err != nil {
+		t.Fatalf("walker() failed on empty dir: %v", err)
+	}
+
+	// Even an empty archive should be valid (just the end-of-archive markers)
+	tr := tar.NewReader(bytes.NewReader(result.Bytes()))
+	_, err = tr.Next()
+	if err != io.EOF {
+		t.Errorf("expected EOF for empty archive, got: %v", err)
+	}
+}
+
+func TestWalker_NonexistentDirectory(t *testing.T) {
+	_, err := walker("/nonexistent/path/to/nowhere")
+	if err == nil {
+		t.Error("walker() should return error for nonexistent directory")
 	}
 }
 

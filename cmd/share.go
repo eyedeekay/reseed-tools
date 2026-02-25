@@ -6,6 +6,7 @@ import (
 
 	"archive/tar"
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -153,6 +154,11 @@ func walker(netDbDir string) (*bytes.Buffer, error) {
 
 	if err := filepath.Walk(netDbDir, walkFn); err != nil {
 		return nil, err
+	}
+	// Finalize the tar archive by writing the two 512-byte zero blocks (end-of-archive marker).
+	// Without this, the tar archive is malformed and may fail to extract on the receiving end.
+	if err := tw.Close(); err != nil {
+		return nil, fmt.Errorf("failed to finalize tar archive: %w", err)
 	}
 	return &buf, nil
 }

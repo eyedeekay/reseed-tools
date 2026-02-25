@@ -34,13 +34,12 @@ func NewKeygenCommand() *cli.Command {
 func keygenAction(c *cli.Context) error {
 	signerID := c.String("signer")
 	tlsHost := c.String("tlsHost")
-	trustProxy := c.Bool("trustProxy")
 
 	// Validate that at least one key generation option is specified
 	if signerID == "" && tlsHost == "" {
 		fmt.Println("You must specify either --tlsHost or --signer")
 		lgr.Error("Key generation requires either --tlsHost or --signer parameter")
-		return fmt.Errorf("You must specify either --tlsHost or --signer")
+		return fmt.Errorf("you must specify either --tlsHost or --signer")
 	}
 
 	// Generate signing certificate if signer ID is provided
@@ -52,14 +51,12 @@ func keygenAction(c *cli.Context) error {
 		}
 	}
 
-	// Generate TLS certificate if host is provided and proxy trust is enabled
-	if trustProxy {
-		if tlsHost != "" {
-			if err := createTLSCertificate(tlsHost); nil != err {
-				lgr.WithError(err).WithField("tls_host", tlsHost).Error("Failed to create TLS certificate")
-				fmt.Println(err)
-				return err
-			}
+	// Generate TLS certificate if host is provided
+	if tlsHost != "" {
+		if err := createTLSCertificate(tlsHost); nil != err {
+			lgr.WithError(err).WithField("tls_host", tlsHost).Error("Failed to create TLS certificate")
+			fmt.Println(err)
+			return err
 		}
 	}
 	return nil

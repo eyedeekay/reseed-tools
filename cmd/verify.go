@@ -3,7 +3,6 @@ package cmd
 import (
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -98,7 +97,7 @@ func su3VerifyAction(c *cli.Context) error {
 func loadAndParseSU3File(filePath string) (*su3.File, error) {
 	su3File := su3.New()
 
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +148,8 @@ func verifySignature(su3File *su3.File, cert *x509.Certificate) error {
 }
 
 // extractSU3Content extracts the content from an SU3 file to a zip file.
+// It writes only the raw content payload (e.g. ZIP data), not the full SU3 binary.
 func extractSU3Content(su3File *su3.File) error {
 	// @todo: don't assume zip
-	return ioutil.WriteFile("extracted.zip", su3File.BodyBytes(), 0o755)
+	return os.WriteFile("extracted.zip", su3File.Content, 0o644)
 }
