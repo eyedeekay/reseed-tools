@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -484,23 +485,25 @@ func TestConstants(t *testing.T) {
 
 	// Test signature type constants
 	expectedSigTypes := map[string]uint16{
-		"DSA":             0,
-		"ECDSAWithSHA256": 1,
-		"ECDSAWithSHA384": 2,
-		"ECDSAWithSHA512": 3,
-		"RSAWithSHA256":   4,
-		"RSAWithSHA384":   5,
-		"RSAWithSHA512":   6,
+		"DSA":                  0,
+		"ECDSAWithSHA256":      1,
+		"ECDSAWithSHA384":      2,
+		"ECDSAWithSHA512":      3,
+		"RSAWithSHA256":        4,
+		"RSAWithSHA384":        5,
+		"RSAWithSHA512":        6,
+		"EdDSASHA512Ed25519ph": 8,
 	}
 
 	actualSigTypes := map[string]uint16{
-		"DSA":             SigTypeDSA,
-		"ECDSAWithSHA256": SigTypeECDSAWithSHA256,
-		"ECDSAWithSHA384": SigTypeECDSAWithSHA384,
-		"ECDSAWithSHA512": SigTypeECDSAWithSHA512,
-		"RSAWithSHA256":   SigTypeRSAWithSHA256,
-		"RSAWithSHA384":   SigTypeRSAWithSHA384,
-		"RSAWithSHA512":   SigTypeRSAWithSHA512,
+		"DSA":                  SigTypeDSA,
+		"ECDSAWithSHA256":      SigTypeECDSAWithSHA256,
+		"ECDSAWithSHA384":      SigTypeECDSAWithSHA384,
+		"ECDSAWithSHA512":      SigTypeECDSAWithSHA512,
+		"RSAWithSHA256":        SigTypeRSAWithSHA256,
+		"RSAWithSHA384":        SigTypeRSAWithSHA384,
+		"RSAWithSHA512":        SigTypeRSAWithSHA512,
+		"EdDSASHA512Ed25519ph": SigTypeEdDSASHA512Ed25519ph,
 	}
 
 	if !reflect.DeepEqual(expectedSigTypes, actualSigTypes) {
@@ -784,5 +787,271 @@ func TestFile_ECDSA_VerifySignature(t *testing.T) {
 				t.Error("Expected verification failure after content tampering")
 			}
 		})
+	}
+}
+
+func TestFile_Sign_Ed25519ph(t *testing.T) {
+	_, edKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	file := New()
+	file.SignatureType = SigTypeEdDSASHA512Ed25519ph
+	file.Content = []byte("test content for Ed25519ph")
+	file.SignerID = []byte("ed25519-test@example.com")
+
+	err = file.Sign(edKey)
+	if err != nil {
+		t.Fatalf("Unexpected error signing with Ed25519ph: %v", err)
+	}
+
+	if len(file.Signature) != ed25519.SignatureSize {
+		t.Errorf("Expected Ed25519 signature length %d, got %d", ed25519.SignatureSize, len(file.Signature))
+	}
+}
+
+func TestFile_Ed25519ph_RoundTrip(t *testing.T) {
+	_, edKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	certDER, err := NewEd25519SigningCertificate("ed25519-roundtrip@example.com", edKey)
+	if err != nil {
+		t.Fatalf("Failed to create Ed25519 certificate: %v", err)
+	}
+	parsedCert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	// Create, sign, marshal, unmarshal, verify
+	originalFile := New()
+	originalFile.SignatureType = SigTypeEdDSASHA512Ed25519ph
+	originalFile.FileType = FileTypeZIP
+	originalFile.ContentType = ContentTypeReseed
+	originalFile.Content = []byte("Ed25519ph round-trip test content")
+	originalFile.SignerID = []byte("ed25519-roundtrip@example.com")
+
+	err = originalFile.Sign(edKey)
+	if err != nil {
+		t.Fatalf("Failed to sign file: %v", err)
+	}
+
+	data, err := originalFile.MarshalBinary()
+	if err != nil {
+		t.Fatalf("Failed to marshal file: %v", err)
+	}
+
+	newFile := &File{}
+	err = newFile.UnmarshalBinary(data)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal file: %v", err)
+	}
+
+	// Verify signature
+	err = newFile.VerifySignature(parsedCert)
+	if err != nil {
+		t.Fatalf("Failed to verify Ed25519ph signature after round-trip: %v", err)
+	}
+
+	// Verify content matches
+	if !bytes.Equal(originalFile.Content, newFile.Content) {
+		t.Error("Content doesn't match after round-trip")
+	}
+
+	if !bytes.Equal(originalFile.SignerID, newFile.SignerID) {
+		t.Error("SignerID doesn't match after round-trip")
+	}
+
+	if newFile.SignatureType != SigTypeEdDSASHA512Ed25519ph {
+		t.Errorf("SignatureType mismatch: expected %d, got %d", SigTypeEdDSASHA512Ed25519ph, newFile.SignatureType)
+	}
+
+	// Verify the signature is 64 bytes
+	if len(newFile.Signature) != ed25519.SignatureSize {
+		t.Errorf("Expected signature length %d after round-trip, got %d", ed25519.SignatureSize, len(newFile.Signature))
+	}
+}
+
+func TestFile_Ed25519ph_VerifySignature(t *testing.T) {
+	_, edKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	certDER, err := NewEd25519SigningCertificate("ed25519-verify@example.com", edKey)
+	if err != nil {
+		t.Fatalf("Failed to create Ed25519 certificate: %v", err)
+	}
+	parsedCert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	file := New()
+	file.SignatureType = SigTypeEdDSASHA512Ed25519ph
+	file.Content = []byte("Ed25519ph verify test")
+	file.SignerID = []byte("ed25519-verify@example.com")
+
+	err = file.Sign(edKey)
+	if err != nil {
+		t.Fatalf("Failed to sign file: %v", err)
+	}
+
+	// Verify valid signature
+	err = file.VerifySignature(parsedCert)
+	if err != nil {
+		t.Errorf("Ed25519ph signature verification failed: %v", err)
+	}
+
+	// Tamper with content and verify failure
+	file.Content = []byte("tampered content")
+	err = file.VerifySignature(parsedCert)
+	if err == nil {
+		t.Error("Expected verification failure after content tampering")
+	}
+}
+
+func TestFile_Ed25519ph_KeyMismatch(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key: %v", err)
+	}
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key: %v", err)
+	}
+	_, edKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		signatureType uint16
+		key           crypto.Signer
+	}{
+		{"RSA key with Ed25519ph type", SigTypeEdDSASHA512Ed25519ph, rsaKey},
+		{"ECDSA key with Ed25519ph type", SigTypeEdDSASHA512Ed25519ph, ecKey},
+		{"Ed25519 key with RSA type", SigTypeRSAWithSHA256, edKey},
+		{"Ed25519 key with ECDSA type", SigTypeECDSAWithSHA256, edKey},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := New()
+			file.SignatureType = tt.signatureType
+			file.Content = []byte("test")
+			file.SignerID = []byte("test@example.com")
+
+			err := file.Sign(tt.key)
+			if err == nil {
+				t.Error("Expected error for key/type mismatch but got none")
+			}
+		})
+	}
+}
+
+func TestFile_Ed25519ph_WrongKeyVerify(t *testing.T) {
+	// Sign with one key, attempt to verify with a different key's certificate
+	_, edKey1, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key 1: %v", err)
+	}
+	_, edKey2, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key 2: %v", err)
+	}
+
+	certDER2, err := NewEd25519SigningCertificate("wrong-key@example.com", edKey2)
+	if err != nil {
+		t.Fatalf("Failed to create certificate: %v", err)
+	}
+	parsedCert2, err := x509.ParseCertificate(certDER2)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+
+	file := New()
+	file.SignatureType = SigTypeEdDSASHA512Ed25519ph
+	file.Content = []byte("wrong key test")
+	file.SignerID = []byte("wrong-key@example.com")
+
+	err = file.Sign(edKey1)
+	if err != nil {
+		t.Fatalf("Failed to sign: %v", err)
+	}
+
+	err = file.VerifySignature(parsedCert2)
+	if err == nil {
+		t.Error("Expected verification failure with wrong key but got none")
+	}
+}
+
+func TestFile_Ed25519ph_NilCertVerify(t *testing.T) {
+	_, edKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	file := New()
+	file.SignatureType = SigTypeEdDSASHA512Ed25519ph
+	file.Content = []byte("nil cert test")
+	file.SignerID = []byte("test@example.com")
+
+	err = file.Sign(edKey)
+	if err != nil {
+		t.Fatalf("Failed to sign: %v", err)
+	}
+
+	err = file.VerifySignature(nil)
+	if err == nil {
+		t.Error("Expected error when verifying with nil certificate")
+	}
+}
+
+func TestFile_Ed25519ph_RSACertVerify(t *testing.T) {
+	// Sign with Ed25519, try to verify with RSA certificate
+	_, edKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key: %v", err)
+	}
+
+	rsaCertDER, err := NewSigningCertificate("rsa@example.com", rsaKey)
+	if err != nil {
+		t.Fatalf("Failed to create RSA certificate: %v", err)
+	}
+	rsaCert, err := x509.ParseCertificate(rsaCertDER)
+	if err != nil {
+		t.Fatalf("Failed to parse RSA certificate: %v", err)
+	}
+
+	file := New()
+	file.SignatureType = SigTypeEdDSASHA512Ed25519ph
+	file.Content = []byte("wrong cert type test")
+	file.SignerID = []byte("test@example.com")
+
+	err = file.Sign(edKey)
+	if err != nil {
+		t.Fatalf("Failed to sign: %v", err)
+	}
+
+	err = file.VerifySignature(rsaCert)
+	if err == nil {
+		t.Error("Expected error when verifying Ed25519ph with RSA certificate")
+	}
+}
+
+func TestConstants_Ed25519ph(t *testing.T) {
+	// Verify Ed25519ph constant matches I2P spec (type code 8, not 7)
+	if SigTypeEdDSASHA512Ed25519ph != 8 {
+		t.Errorf("Expected SigTypeEdDSASHA512Ed25519ph = 8 per I2P spec, got %d", SigTypeEdDSASHA512Ed25519ph)
 	}
 }
