@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/eyedeekay/unembed"
 	"gitlab.com/golang-commonmark/markdown"
@@ -39,10 +40,14 @@ var SupportedLanguages = []language.Tag{
 }
 
 var (
+	// cachedLanguageMu protects CachedLanguagePages from concurrent map access.
+	cachedLanguageMu sync.RWMutex
 	// CachedLanguagePages stores pre-processed language-specific content pages for performance.
 	// Keys are language directory paths and values are rendered HTML content to avoid
 	// repeated markdown processing on each request for better response times.
 	CachedLanguagePages = map[string]string{}
+	// cachedDataMu protects CachedDataPages from concurrent map access.
+	cachedDataMu sync.RWMutex
 	// CachedDataPages stores static file content in memory for faster serving.
 	// Keys are file paths and values are raw file content bytes to reduce filesystem I/O
 	// and improve performance for frequently accessed static resources.
@@ -246,17 +251,26 @@ func (srv *Server) handleHomepageRequest(w http.ResponseWriter, baseLanguage str
 func handleAFile(w http.ResponseWriter, dirPath, file string) {
 	BaseContentPath, _ := StableContentPath()
 	file = filepath.Join(dirPath, file)
-	if _, prs := CachedDataPages[file]; !prs {
+
+	cachedDataMu.RLock()
+	cached, prs := CachedDataPages[file]
+	cachedDataMu.RUnlock()
+
+	if !prs {
 		path := filepath.Join(BaseContentPath, file)
 		f, err := os.ReadFile(path)
 		if err != nil {
 			w.Write([]byte("Oops! Something went wrong handling your language. Please file a bug at https://i2pgit.org/go-i2p/reseed-tools\n\t" + err.Error()))
 			return
 		}
+
+		cachedDataMu.Lock()
 		CachedDataPages[file] = f
-		w.Write([]byte(CachedDataPages[file]))
+		cachedDataMu.Unlock()
+
+		w.Write(f)
 	} else {
-		w.Write(CachedDataPages[file])
+		w.Write(cached)
 	}
 }
 
@@ -264,17 +278,22 @@ func handleAFile(w http.ResponseWriter, dirPath, file string) {
 // It reads markdown files from language subdirectories, converts them to HTML, and caches
 // the results for efficient serving of multilingual reseed server interface content.
 func handleALocalizedFile(w http.ResponseWriter, dirPath string) {
-	if _, prs := CachedLanguagePages[dirPath]; !prs {
+	cachedLanguageMu.RLock()
+	cached, prs := CachedLanguagePages[dirPath]
+	cachedLanguageMu.RUnlock()
+
+	if !prs {
 		BaseContentPath, _ := StableContentPath()
 		dir := filepath.Join(BaseContentPath, "lang", dirPath)
 		files, err := os.ReadDir(dir)
 		if err != nil {
 			w.Write([]byte("Oops! Something went wrong handling your language. Please file a bug at https://i2pgit.org/go-i2p/reseed-tools\n\t" + err.Error()))
+			return
 		}
 		var f []byte
 		for _, file := range files {
 			if !strings.HasSuffix(file.Name(), ".md") {
-				return
+				continue
 			}
 			trimmedName := strings.TrimSuffix(file.Name(), ".md")
 			path := filepath.Join(dir, file.Name())
@@ -286,11 +305,14 @@ func handleALocalizedFile(w http.ResponseWriter, dirPath string) {
 			f = append(f, []byte(`<div id="`+trimmedName+`">`)...)
 			f = append(f, []byte(md.RenderToString(b))...)
 			f = append(f, []byte(`</div>`)...)
-
 		}
+
+		cachedLanguageMu.Lock()
 		CachedLanguagePages[dirPath] = string(f)
-		w.Write([]byte(CachedLanguagePages[dirPath]))
+		cachedLanguageMu.Unlock()
+
+		w.Write(f)
 	} else {
-		w.Write([]byte(CachedLanguagePages[dirPath]))
+		w.Write([]byte(cached))
 	}
 }

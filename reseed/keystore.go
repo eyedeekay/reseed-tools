@@ -3,6 +3,7 @@ package reseed
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -45,6 +46,9 @@ func (ks *KeyStore) reseederCertificate(dir string, signer []byte) (*x509.Certif
 	}
 
 	certPem, _ := pem.Decode(certString)
+	if certPem == nil {
+		return nil, fmt.Errorf("failed to decode PEM data from certificate file %s: file does not contain valid PEM", certPath)
+	}
 	cert, err := x509.ParseCertificate(certPem.Bytes)
 	if err != nil {
 		lgr.WithError(err).WithField("cert_file", certPath).WithField("signer", string(signer)).Error("Failed to parse reseed certificate")

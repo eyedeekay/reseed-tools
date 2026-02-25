@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -488,18 +489,16 @@ func TestKeyStore_ReseederCertificate_NonPEMData(t *testing.T) {
 		t.Fatalf("Failed to write invalid certificate file: %v", err)
 	}
 
-	// This test captures the bug in the original code where pem.Decode returns nil
-	// and the code tries to access certPem.Bytes without checking for nil
+	// After the nil PEM decode fix, the function should return a descriptive error
+	// instead of panicking with a nil pointer dereference.
 	ks := &KeyStore{Path: tmpDir}
-
-	// The function should panic due to nil pointer dereference
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic due to nil pointer dereference, but didn't panic")
-		}
-	}()
-
-	_, _ = ks.ReseederCertificate([]byte(signer))
+	_, err = ks.ReseederCertificate([]byte(signer))
+	if err == nil {
+		t.Error("Expected error for non-PEM data, got nil")
+	}
+	if err != nil && !strings.Contains(err.Error(), "failed to decode PEM data") {
+		t.Errorf("Expected PEM decode error, got: %v", err)
+	}
 }
 
 // Benchmark tests for performance validation
