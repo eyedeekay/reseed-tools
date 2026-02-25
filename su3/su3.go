@@ -48,9 +48,6 @@ type File struct {
 
 	// Signature contains the cryptographic signature for file verification
 	Signature []byte
-
-	// SignedBytes stores the signed portion of the file for verification purposes
-	SignedBytes []byte
 }
 
 // New creates a new SU3 file with default settings and current timestamp.
@@ -146,8 +143,11 @@ func (s *File) Sign(privkey crypto.Signer) error {
 	// Dispatch signing based on key type
 	switch key := privkey.(type) {
 	case *rsa.PrivateKey:
-		// Generate RSA signature using PKCS#1 v1.5 padding scheme
-		// The hash type is already applied, so we pass 0 to indicate pre-hashed data
+		// Generate RSA signature using PKCS#1 v1.5 padding scheme.
+		// We pass hash=0 to produce raw PKCS#1 v1.5 signatures without the
+		// DigestInfo ASN.1 prefix. This is intentional for I2P SU3 format
+		// compatibility — the I2P spec expects pre-hashed data signed without
+		// the standard OID prefix. Both signing and verification use hash=0.
 		sig, err := rsa.SignPKCS1v15(rand.Reader, key, 0, digest)
 		if err != nil {
 			lgr.WithError(err).Error("Failed to generate RSA signature for SU3 file")

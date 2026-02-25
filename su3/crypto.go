@@ -28,7 +28,8 @@ type dsaSignature struct {
 }
 
 // ecdsaSignature represents an ECDSA signature, which has the same structure as DSA.
-// This type alias provides semantic clarity when working with ECDSA signatures.
+// This named type definition provides semantic clarity when working with ECDSA signatures.
+// Note: This is a type definition (not a type alias), so ecdsaSignature has its own method set.
 type ecdsaSignature dsaSignature
 
 // checkSignature verifies a digital signature against signed data using the specified certificate.
@@ -69,6 +70,11 @@ func mapAlgorithmToHashType(algo x509.SignatureAlgorithm) (crypto.Hash, error) {
 		hashType = crypto.SHA384
 	case x509.SHA512WithRSA, x509.ECDSAWithSHA512:
 		hashType = crypto.SHA512
+	case x509.PureEd25519:
+		// Ed25519ph is handled separately via verifyEd25519ph() in su3.go.
+		// If a caller reaches this via checkSignature with PureEd25519, use SHA-512
+		// as the prehash algorithm consistent with Ed25519ph requirements.
+		hashType = crypto.SHA512
 	default:
 		lgr.WithField("algorithm", algo).Error("Unsupported signature algorithm")
 		return 0, x509.ErrUnsupportedAlgorithm
@@ -97,7 +103,9 @@ func verifySignatureByKeyType(publicKey crypto.PublicKey, digest, signature []by
 	// Each algorithm has different signature formats and verification procedures
 	switch pub := publicKey.(type) {
 	case *rsa.PublicKey:
-		// the digest is already hashed, so we force a 0 here
+		// We pass hash=0 to verify raw PKCS#1 v1.5 signatures without the
+		// DigestInfo ASN.1 prefix. This matches the signing mode in su3.go
+		// and is required for I2P SU3 format compatibility.
 		return rsa.VerifyPKCS1v15(pub, 0, digest, signature)
 	case *dsa.PublicKey:
 		return verifyDSASignature(pub, digest, signature)
@@ -164,6 +172,10 @@ func verifyECDSASignature(pub *ecdsa.PublicKey, digest, signature []byte) error 
 // I2P reseed operations. The certificate is valid for 10 years and includes proper key usage
 // extensions for digital signatures.
 func NewSigningCertificate(signerID string, privateKey *rsa.PrivateKey) ([]byte, error) {
+	if privateKey == nil {
+		return nil, fmt.Errorf("private key cannot be nil")
+	}
+
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -219,6 +231,10 @@ func NewSigningCertificate(signerID string, privateKey *rsa.PrivateKey) ([]byte,
 // for use in I2P reseed operations. The certificate is valid for 10 years and includes
 // proper key usage extensions for digital signatures.
 func NewECDSASigningCertificate(signerID string, privateKey *ecdsa.PrivateKey) ([]byte, error) {
+	if privateKey == nil {
+		return nil, fmt.Errorf("ECDSA private key cannot be nil")
+	}
+
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -263,8 +279,9 @@ func NewECDSASigningCertificate(signerID string, privateKey *ecdsa.PrivateKey) (
 	return cert, nil
 }
 
-// ecdsaCurveForSignatureType returns the appropriate elliptic curve for the
-// given ECDSA signature type constant. Returns nil for non-ECDSA types.
+// ECDSACurveForSignatureType returns the appropriate elliptic curve for the
+// given ECDSA signature type constant. Returns nil for non-ECDSA or
+// unrecognized signature types; callers should check for a nil return value.
 func ECDSACurveForSignatureType(sigType uint16) elliptic.Curve {
 	switch sigType {
 	case SigTypeECDSAWithSHA256:
@@ -283,6 +300,10 @@ func ECDSACurveForSignatureType(sigType uint16) elliptic.Curve {
 // for use in I2P reseed operations. The certificate is valid for 10 years and includes
 // proper key usage extensions for digital signatures.
 func NewEd25519SigningCertificate(signerID string, privateKey ed25519.PrivateKey) ([]byte, error) {
+	if privateKey == nil {
+		return nil, fmt.Errorf("Ed25519 private key cannot be nil")
+	}
+
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {

@@ -1,6 +1,10 @@
 package su3
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -144,17 +148,38 @@ func TestNewSigningCertificate_DifferentSignerIDs(t *testing.T) {
 func TestNewSigningCertificate_NilPrivateKey(t *testing.T) {
 	signerID := "test@example.com"
 
-	// The function should handle nil private key gracefully or panic
-	// Since the current implementation doesn't check for nil, we expect a panic
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic when private key is nil, but function completed normally")
-		}
-	}()
-
+	// With nil key validation, the function should return a descriptive error
+	// instead of panicking inside x509.CreateCertificate.
 	_, err := NewSigningCertificate(signerID, nil)
 	if err == nil {
-		t.Error("Expected error when private key is nil")
+		t.Fatal("Expected error when private key is nil")
+	}
+	if err.Error() != "private key cannot be nil" {
+		t.Errorf("Expected 'private key cannot be nil' error, got: %v", err)
+	}
+}
+
+func TestNewECDSASigningCertificate_NilPrivateKey(t *testing.T) {
+	signerID := "test@example.com"
+
+	_, err := NewECDSASigningCertificate(signerID, nil)
+	if err == nil {
+		t.Fatal("Expected error when ECDSA private key is nil")
+	}
+	if err.Error() != "ECDSA private key cannot be nil" {
+		t.Errorf("Expected 'ECDSA private key cannot be nil' error, got: %v", err)
+	}
+}
+
+func TestNewEd25519SigningCertificate_NilPrivateKey(t *testing.T) {
+	signerID := "test@example.com"
+
+	_, err := NewEd25519SigningCertificate(signerID, nil)
+	if err == nil {
+		t.Fatal("Expected error when Ed25519 private key is nil")
+	}
+	if err.Error() != "Ed25519 private key cannot be nil" {
+		t.Errorf("Expected 'Ed25519 private key cannot be nil' error, got: %v", err)
 	}
 }
 
@@ -481,6 +506,103 @@ func TestNewSigningCertificate_CertificateFields(t *testing.T) {
 
 	if certPubKey.E != privateKey.PublicKey.E {
 		t.Error("Certificate public key exponent doesn't match private key")
+	}
+}
+
+func TestNewECDSASigningCertificate_ValidInput(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate ECDSA key: %v", err)
+	}
+
+	signerID := "test@example.com"
+	certDER, err := NewECDSASigningCertificate(signerID, privateKey)
+	if err != nil {
+		t.Fatalf("NewECDSASigningCertificate failed: %v", err)
+	}
+	if len(certDER) == 0 {
+		t.Fatal("Certificate should not be empty")
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+	if cert.Subject.CommonName != signerID {
+		t.Errorf("Expected CommonName %s, got %s", signerID, cert.Subject.CommonName)
+	}
+	if _, ok := cert.PublicKey.(*ecdsa.PublicKey); !ok {
+		t.Errorf("Expected ECDSA public key, got %T", cert.PublicKey)
+	}
+}
+
+func TestNewEd25519SigningCertificate_ValidInput(t *testing.T) {
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Failed to generate Ed25519 key: %v", err)
+	}
+
+	signerID := "test@example.com"
+	certDER, err := NewEd25519SigningCertificate(signerID, privateKey)
+	if err != nil {
+		t.Fatalf("NewEd25519SigningCertificate failed: %v", err)
+	}
+	if len(certDER) == 0 {
+		t.Fatal("Certificate should not be empty")
+	}
+
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("Failed to parse certificate: %v", err)
+	}
+	if cert.Subject.CommonName != signerID {
+		t.Errorf("Expected CommonName %s, got %s", signerID, cert.Subject.CommonName)
+	}
+	if _, ok := cert.PublicKey.(ed25519.PublicKey); !ok {
+		t.Errorf("Expected Ed25519 public key, got %T", cert.PublicKey)
+	}
+}
+
+func TestECDSACurveForSignatureType(t *testing.T) {
+	tests := []struct {
+		name     string
+		sigType  uint16
+		expected elliptic.Curve
+	}{
+		{"ECDSA SHA256 returns P256", SigTypeECDSAWithSHA256, elliptic.P256()},
+		{"ECDSA SHA384 returns P384", SigTypeECDSAWithSHA384, elliptic.P384()},
+		{"ECDSA SHA512 returns P521", SigTypeECDSAWithSHA512, elliptic.P521()},
+		{"RSA type returns nil", SigTypeRSAWithSHA512, nil},
+		{"DSA type returns nil", SigTypeDSA, nil},
+		{"Ed25519 type returns nil", SigTypeEdDSASHA512Ed25519ph, nil},
+		{"Unknown type returns nil", uint16(999), nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ECDSACurveForSignatureType(tt.sigType)
+			if got != tt.expected {
+				t.Errorf("ECDSACurveForSignatureType(%d) = %v, want %v", tt.sigType, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMapAlgorithmToHashType_Ed25519(t *testing.T) {
+	// Verify that PureEd25519 maps to SHA-512 for Ed25519ph compatibility
+	hashType, err := mapAlgorithmToHashType(x509.PureEd25519)
+	if err != nil {
+		t.Fatalf("mapAlgorithmToHashType(PureEd25519) returned error: %v", err)
+	}
+	if hashType != crypto.SHA512 {
+		t.Errorf("mapAlgorithmToHashType(PureEd25519) = %v, want SHA512", hashType)
+	}
+}
+
+func TestMapAlgorithmToHashType_UnsupportedAlgorithm(t *testing.T) {
+	_, err := mapAlgorithmToHashType(x509.SignatureAlgorithm(999))
+	if err == nil {
+		t.Fatal("Expected error for unsupported algorithm")
 	}
 }
 
