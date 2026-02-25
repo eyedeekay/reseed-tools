@@ -69,12 +69,13 @@ type ReseederImpl struct {
 }
 
 // NewReseeder creates a new reseed service instance with default configuration.
-// It initializes the service with standard parameters: 77 router infos per SU3 file
-// and 90-hour rebuild intervals to balance freshness with server performance.
+// It initializes the service with standard parameters: 61 router infos per SU3 file
+// (matching the CLI --numRi default) and 90-hour rebuild intervals to balance
+// freshness with server performance.
 func NewReseeder(netdb *LocalNetDbImpl) *ReseederImpl {
 	rs := &ReseederImpl{
 		netdb:           netdb,
-		NumRi:           77,
+		NumRi:           61,
 		RebuildInterval: 90 * time.Hour,
 	}
 	// Initialize with empty slice to prevent nil panics
@@ -120,7 +121,11 @@ func (rs *ReseederImpl) rebuild() error {
 		return fmt.Errorf("unable to get routerInfos: %s", err)
 	}
 
-	// use only 75% of routerInfos
+	// Use only 75% of routerInfos. Shuffle first to avoid deterministic
+	// exclusion of the same routers every rebuild (filepath.Walk returns
+	// files in lexicographic order, so without shuffling the first 25% by
+	// sorted filename are always dropped).
+	rand.Shuffle(len(ris), func(i, j int) { ris[i], ris[j] = ris[j], ris[i] })
 	ris = ris[len(ris)/4:]
 
 	// fail if we don't have enough RIs to make a single reseed file
@@ -179,13 +184,22 @@ func (rs *ReseederImpl) seedsProducer(ris []routerInfo) <-chan []routerInfo {
 	out := make(chan []routerInfo)
 
 	go func() {
+		// Pre-allocate index array; reused across iterations to reduce allocation.
+		// Partial Fisher-Yates shuffle selects only NumRi elements per iteration,
+		// reducing random number calls from O(n) to O(NumRi) per SU3 file.
+		indices := make([]int, lenRis)
 		for i := 0; i < numSu3s; i++ {
-			var seeds []routerInfo
-			unsorted := rand.Perm(lenRis)
-			for z := 0; z < rs.NumRi; z++ {
-				seeds = append(seeds, ris[unsorted[z]])
+			// Reset index array for uniform selection
+			for k := range indices {
+				indices[k] = k
 			}
-
+			// Partial Fisher-Yates: shuffle only first NumRi positions
+			seeds := make([]routerInfo, rs.NumRi)
+			for z := 0; z < rs.NumRi; z++ {
+				j := z + rand.Intn(lenRis-z)
+				indices[z], indices[j] = indices[j], indices[z]
+				seeds[z] = ris[indices[z]]
+			}
 			out <- seeds
 		}
 		close(out)

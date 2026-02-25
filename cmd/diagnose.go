@@ -33,8 +33,8 @@ to prevent "mapping format violation" errors during reseed operations.`,
 			&cli.DurationFlag{
 				Name:    "max-age",
 				Aliases: []string{"a"},
-				Usage:   "Maximum age for RouterInfo files to consider (e.g., 192h for 8 days)",
-				Value:   192 * time.Hour, // Default matches reseed server
+				Usage:   "Maximum age for RouterInfo files to consider (e.g., 72h for 3 days)",
+				Value:   72 * time.Hour, // Matches reseed server --routerInfoAge default (I2P standard)
 			},
 			&cli.BoolFlag{
 				Name:    "remove-bad",
