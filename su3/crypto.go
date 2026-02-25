@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/dsa"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -102,6 +103,15 @@ func verifySignatureByKeyType(publicKey crypto.PublicKey, digest, signature []by
 		return verifyDSASignature(pub, digest, signature)
 	case *ecdsa.PublicKey:
 		return verifyECDSASignature(pub, digest, signature)
+	case ed25519.PublicKey:
+		// Note: For standard checkSignature path, this verifies a raw Ed25519 signature
+		// against a pre-computed digest. Ed25519ph verification is handled separately
+		// in verifyEd25519ph() in su3.go.
+		if !ed25519.Verify(pub, digest, signature) {
+			lgr.Error("Ed25519 signature verification failed")
+			return errors.New("ed25519: signature verification failure")
+		}
+		return nil
 	}
 	lgr.WithField("public_key_type", fmt.Sprintf("%T", publicKey)).Error("Unsupported public key algorithm")
 	return x509.ErrUnsupportedAlgorithm
@@ -266,4 +276,53 @@ func ECDSACurveForSignatureType(sigType uint16) elliptic.Curve {
 	default:
 		return nil
 	}
+}
+
+// NewEd25519SigningCertificate creates a self-signed X.509 certificate for SU3 file signing
+// using an Ed25519 private key. It generates a certificate with the specified signer ID
+// for use in I2P reseed operations. The certificate is valid for 10 years and includes
+// proper key usage extensions for digital signatures.
+func NewEd25519SigningCertificate(signerID string, privateKey ed25519.PrivateKey) ([]byte, error) {
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	var subjectKeyId []byte
+	isCA := true
+	if signerID != "" {
+		subjectKeyId = []byte(signerID)
+	} else {
+		subjectKeyId = []byte("")
+		isCA = false
+	}
+
+	template := &x509.Certificate{
+		BasicConstraintsValid: true,
+		IsCA:                  isCA,
+		SubjectKeyId:          subjectKeyId,
+		SerialNumber:          serialNumber,
+		Subject: pkix.Name{
+			Organization:       []string{"I2P Anonymous Network"},
+			OrganizationalUnit: []string{"I2P"},
+			Locality:           []string{"XX"},
+			StreetAddress:      []string{"XX"},
+			Country:            []string{"XX"},
+			CommonName:         signerID,
+		},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().AddDate(10, 0, 0),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+	}
+
+	publicKey := privateKey.Public()
+	parent := template
+	cert, err := x509.CreateCertificate(rand.Reader, template, parent, publicKey, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert, nil
 }

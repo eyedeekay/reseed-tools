@@ -35,6 +35,15 @@ const (
 	// Maximum strength RSA signing with 512-bit hash, default for new SU3 files.
 	SigTypeRSAWithSHA512 = uint16(6)
 
+	// Note: Signature type 7 (EdDSA_SHA512_Ed25519) is used for in-network
+	// Router Identities and Destinations but is NOT defined for SU3 files.
+	// The SU3 specification skips type 7 and uses type 8 for EdDSA.
+
+	// SigTypeEdDSASHA512Ed25519ph represents EdDSA signature with SHA-512 prehash
+	// using Ed25519ph (RFC 8032). The data is hashed with SHA-512 before signing.
+	// Per I2P SU3 spec, this is type code 0x0008. Signature length is always 64 bytes.
+	SigTypeEdDSASHA512Ed25519ph = uint16(8)
+
 	// ContentTypeUnknown indicates SU3 file contains unspecified content type.
 	// Used when the content type cannot be determined or is not categorized.
 	ContentTypeUnknown = uint8(0)

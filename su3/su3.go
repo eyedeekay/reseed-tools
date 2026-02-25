@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -114,6 +115,13 @@ func (s *File) Sign(privkey crypto.Signer) error {
 			return err
 		}
 		hashType = crypto.SHA512
+	case SigTypeEdDSASHA512Ed25519ph:
+		if err := validateEd25519Key(privkey); err != nil {
+			return err
+		}
+		// Ed25519ph uses SHA-512 prehash: we hash the data ourselves,
+		// then pass the 64-byte digest to Ed25519 Sign with Hash option.
+		hashType = crypto.SHA512
 	default:
 		lgr.WithField("signature_type", s.SignatureType).Error("Unknown signature type for SU3 signing")
 		return fmt.Errorf("unknown signature type: %d", s.SignatureType)
@@ -122,11 +130,14 @@ func (s *File) Sign(privkey crypto.Signer) error {
 	// Pre-calculate signature length so BodyBytes() generates a correct header.
 	// For ECDSA, we use a fixed canonical length per curve so the header is
 	// deterministic. The actual DER signature will be zero-padded to this length.
+	// Ed25519 signatures are always exactly 64 bytes.
 	switch key := privkey.(type) {
 	case *rsa.PrivateKey:
 		s.Signature = make([]byte, key.Size())
 	case *ecdsa.PrivateKey:
 		s.Signature = make([]byte, ecdsaCanonicalSigLen(key))
+	case ed25519.PrivateKey:
+		s.Signature = make([]byte, ed25519.SignatureSize) // always 64 bytes
 	default:
 		return fmt.Errorf("unsupported key type: %T", privkey)
 	}
@@ -164,6 +175,16 @@ func (s *File) Sign(privkey crypto.Signer) error {
 		padded := make([]byte, canonLen)
 		copy(padded, sig)
 		s.Signature = padded
+	case ed25519.PrivateKey:
+		// Ed25519ph (prehash): the digest is the SHA-512 hash of the body.
+		// We pass it to Sign with Options{Hash: SHA512} to indicate prehash mode.
+		// Per RFC 8032 and I2P spec, Ed25519ph signatures are always 64 bytes.
+		sig, err := key.Sign(rand.Reader, digest, &ed25519.Options{Hash: crypto.SHA512})
+		if err != nil {
+			lgr.WithError(err).Error("Failed to generate Ed25519ph signature for SU3 file")
+			return err
+		}
+		s.Signature = sig
 	default:
 		return fmt.Errorf("unsupported key type for signing: %T", privkey)
 	}
@@ -188,6 +209,14 @@ func validateECDSAKey(privkey crypto.Signer, expectedCurve elliptic.Curve) error
 	if ecKey.Curve != expectedCurve {
 		return fmt.Errorf("ECDSA key curve mismatch: expected %s, got %s",
 			expectedCurve.Params().Name, ecKey.Curve.Params().Name)
+	}
+	return nil
+}
+
+// validateEd25519Key checks that privkey is an ed25519.PrivateKey.
+func validateEd25519Key(privkey crypto.Signer) error {
+	if _, ok := privkey.(ed25519.PrivateKey); !ok {
+		return fmt.Errorf("EdDSA signature type requires ed25519.PrivateKey, got %T", privkey)
 	}
 	return nil
 }
@@ -269,6 +298,10 @@ func (s *File) BodyBytes() []byte {
 		} else {
 			signatureLength = uint16(256) // Default for 2048-bit RSA key
 		}
+	case SigTypeEdDSASHA512Ed25519ph:
+		// Ed25519 signatures are always exactly 64 bytes per I2P spec and RFC 8032.
+		// No variable-length padding needed.
+		signatureLength = uint16(ed25519.SignatureSize)
 	}
 
 	// Ensure version field meets minimum length requirement by zero-padding
@@ -392,6 +425,11 @@ func (s *File) VerifySignature(cert *x509.Certificate) error {
 		sigAlg = x509.SHA384WithRSA
 	case SigTypeRSAWithSHA512:
 		sigAlg = x509.SHA512WithRSA
+	case SigTypeEdDSASHA512Ed25519ph:
+		// Ed25519ph doesn't map to a standard x509.SignatureAlgorithm.
+		// Go's x509.PureEd25519 is for pure Ed25519, not Ed25519ph (prehash).
+		// We handle verification directly using crypto/ed25519.
+		return s.verifyEd25519ph(cert)
 	default:
 		lgr.WithField("signature_type", s.SignatureType).Error("Unknown signature type for SU3 verification")
 		return fmt.Errorf("unknown signature type: %d", s.SignatureType)
@@ -401,6 +439,34 @@ func (s *File) VerifySignature(cert *x509.Certificate) error {
 	if err != nil {
 		lgr.WithError(err).WithField("signature_type", s.SignatureType).Error("SU3 signature verification failed")
 		return err
+	}
+
+	return nil
+}
+
+// verifyEd25519ph verifies an Ed25519ph (prehash) signature using the certificate's
+// public key. Ed25519ph is not a standard x509.SignatureAlgorithm in Go, so we
+// extract the Ed25519 public key from the certificate and verify directly.
+// Per I2P spec, Ed25519ph hashes the data with SHA-512 first, then verifies
+// the 64-byte signature against that digest.
+func (s *File) verifyEd25519ph(cert *x509.Certificate) error {
+	if cert == nil {
+		return fmt.Errorf("certificate is nil")
+	}
+
+	pubKey, ok := cert.PublicKey.(ed25519.PublicKey)
+	if !ok {
+		return fmt.Errorf("Ed25519ph verification requires ed25519.PublicKey, got %T", cert.PublicKey)
+	}
+
+	// Ed25519ph: hash the body with SHA-512, then verify against the digest
+	h := crypto.SHA512.New()
+	h.Write(s.BodyBytes())
+	digest := h.Sum(nil)
+
+	if err := ed25519.VerifyWithOptions(pubKey, digest, s.Signature, &ed25519.Options{Hash: crypto.SHA512}); err != nil {
+		lgr.WithError(err).Error("Ed25519ph signature verification failed")
+		return fmt.Errorf("Ed25519ph verification failure: %w", err)
 	}
 
 	return nil
