@@ -243,6 +243,9 @@ func TestPingWriteContent_WritesFile(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
+	// Pre-create the content directory so StableContentPath returns a consistent path
+	StableContentPath()
+
 	// Use URL with trailing slash so i2pseeds.su3 suffix is appended correctly
 	err = PingWriteContent(server.URL + "/")
 	if err != nil {
@@ -291,6 +294,9 @@ func TestPingWriteContent_SkipsExistingFile(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
+	// Pre-create content directory for consistent path behavior
+	StableContentPath()
+
 	// First call creates the file
 	err = PingWriteContent(server.URL + "/")
 	if err != nil {
@@ -321,6 +327,9 @@ func TestPingWriteContent_FailedPing(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Chdir(origDir)
+
+	// Pre-create content directory for consistent path behavior
+	StableContentPath()
 
 	// Use trailing slash for valid URL formation
 	err = PingWriteContent(server.URL + "/")
@@ -390,7 +399,8 @@ func TestGetPingFiles_FindsTodaysPingFiles(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	// Ensure content path exists via extraction
+	// Ensure content dir exists, then get the stable path
+	StableContentPath()
 	BaseContentPath, err := StableContentPath()
 	if err != nil {
 		t.Fatalf("StableContentPath: %v", err)
@@ -445,6 +455,8 @@ func TestReadOut_WithPingFiles(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
+	// First call triggers content extraction; second call returns stable path
+	StableContentPath()
 	BaseContentPath, err := StableContentPath()
 	if err != nil {
 		t.Fatalf("StableContentPath: %v", err)
@@ -509,6 +521,8 @@ func TestReadOut_HTMLEscapesHostnames(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
+	// First call triggers content extraction; second call returns stable path
+	StableContentPath()
 	BaseContentPath, err := StableContentPath()
 	if err != nil {
 		t.Fatalf("StableContentPath: %v", err)
