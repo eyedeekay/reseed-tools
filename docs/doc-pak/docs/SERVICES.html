@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Integration - eyedeekay/reseed-tools</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <nav class="nav-sidebar">
+    <div class="repo-info">
+      <h2>
+        <a href="../index.html">eyedeekay/reseed-tools</a>
+      </h2>
+      <div class="repo-meta">
+        📝 550 commits
+         • 📜 License
+      </div>
+    </div>
+    
+    <ul class="nav-links">
+      <li><a href="../index.html">Repository Overview</a></li>
+      
+      
+        <div class="nav-section-title">Documentation:</div>
+        
+          <li><a href="../docs/CHANGELOG.html" >CHANGELOG</a></li>
+        
+          <li><a href="../docs/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/REMOTE.html" >REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE.html" >REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE-SSH.html" >REMOTE SSH</a></li>
+        
+          <li><a href="../docs/docs/SERVICES.html" >Service Integration</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/SERVICES.html" class="active">Service Integration</a></li>
+        
+          <li><a href="../docs/docs/TLS.html" >TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/TLS.html" >TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+          <li><a href="../docs/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+      
+    </ul>
+    
+    <div class="nav-footer">
+      <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a>
+    </div>
+  </nav>
+  
+  <div class="main-content">
+    <header class="page-header">
+      <h1>Service Integration - eyedeekay/reseed-tools</h1>
+    </header>
+    
+    <main>
+      <div class="doc-content">
+        <h1 id="service-integration">Service Integration</h1>
+
+<p>Support for running as a system service as part of the reseed package
+is new. PR&rsquo;s that improve integration are welcome.</p>
+
+<h2 id="systemd-service">Systemd Service</h2>
+
+<p>A systemd service is provided which should work with the I2P Debian package
+when reseed-tools is installed in <code>/usr/bin/reseed-tools</code>. If you install with
+<code>make install</code> this service is also installed. This service will cause the
+bundles to regenerate every 12 hours.</p>
+
+<p>The contact email for your reseed should be added in:
+<code>/etc/systemd/system/reseed.service.d/override.conf</code>.</p>
+
+<p>Self-signed certificates will be auto-generated for these services. To change
+this you should edit the <code>/etc/systemd/system/reseed.service</code>. For instance:</p>
+
+<pre><code>ExecStart=/usr/bin/reseed-tools reseed --yes=true --netdb=/var/lib/i2p/i2p-config/netDb --trustProxy --ip=127.0.0.1
+</code></pre>
+
+<p>to disable self-signed certificate generation.</p>
+
+<ul>
+<li>To enable starting the reseed service automatically with the system: <code>sudo systemctl enable reseed.service</code></li>
+<li>To run the service manually: <code>sudo systemctl start reseed.service</code><br>
+</li>
+<li>To reload the systemd services: <code>sudo systemctl daemon-reload</code></li>
+<li>To view the status/logs: <code>sudo journalctl -u reseed.service</code></li>
+</ul>
+
+<h2 id="sysv-service">SysV Service</h2>
+
+<p>An initscript is also provided. The initscript, unlike the systemd service,
+cannot schedule itself to restart. You should restart the service roughly once
+a day to ensure that the information does not expire.</p>
+
+<p>The contact email for your reseed should be added in:
+<code>/etc/default/reseed</code>.</p>
+
+<p>Self-signed certificates will be auto-generated for these services.
+To change this you should edit the <code>/etc/default/reseed</code>.
+Create a <code>MORE_OPTIONS=&quot;&quot;</code> field. For instance:</p>
+
+<pre><code class="language-sh">MORE_OPTIONS=&quot;--trustProxy --ip=127.0.0.1&quot;
+</code></pre>
+
+<p>will disable self-signed certificate generation.</p>
+
+      </div>
+    </main>
+    
+    <footer class="page-footer">
+      <p>Generated on 2026-02-26 00:19:50 • <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a></p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REMOTE - eyedeekay/reseed-tools</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <nav class="nav-sidebar">
+    <div class="repo-info">
+      <h2>
+        <a href="../index.html">eyedeekay/reseed-tools</a>
+      </h2>
+      <div class="repo-meta">
+        📝 550 commits
+         • 📜 License
+      </div>
+    </div>
+    
+    <ul class="nav-links">
+      <li><a href="../index.html">Repository Overview</a></li>
+      
+      
+        <div class="nav-section-title">Documentation:</div>
+        
+          <li><a href="../docs/CHANGELOG.html" >CHANGELOG</a></li>
+        
+          <li><a href="../docs/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/REMOTE.html" class="active">REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE.html" >REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE-SSH.html" >REMOTE SSH</a></li>
+        
+          <li><a href="../docs/docs/SERVICES.html" >Service Integration</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/SERVICES.html" >Service Integration</a></li>
+        
+          <li><a href="../docs/docs/TLS.html" >TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/TLS.html" >TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+          <li><a href="../docs/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+      
+    </ul>
+    
+    <div class="nav-footer">
+      <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a>
+    </div>
+  </nav>
+  
+  <div class="main-content">
+    <header class="page-header">
+      <h1>REMOTE - eyedeekay/reseed-tools</h1>
+    </header>
+    
+    <main>
+      <div class="doc-content">
+        <h2 id="using-a-remote-network-database">Using a remote Network Database</h2>
+
+<p>Beginning in <code>reseed-tools 0.2.5</code> it is possible to use reseed-tools to &ldquo;share&rdquo; a netDb directory on one host with a reseed server on another host.
+This feature is built into the reseed-tools software.
+It is also possible to do this manually using <code>sshfs</code>, <code>ssh</code> combined with <code>cron</code>, and most available backup utilities like <code>borg</code> and <code>syncthing</code>.
+This guide only covers <code>reseed-tools</code>.</p>
+
+<h2 id="password-protected-sharing-of-netdb-content-over-i2p">Password-Protected Sharing of NetDB content over I2P</h2>
+
+<p>Run this command on a well-integrated I2P router which is <strong>not</strong> hosting a reseed server on the same IP address.
+To share the whole contents of your netDb directory over I2P, run reseed-tools with the following arguments:</p>
+
+<pre><code class="language-sh">reseed-tools share --share-password $(use_a_strong_password) --netdb $(path_to_your_netdb)
+</code></pre>
+
+<p>In a few seconds, you will have a new I2P site which will provide your netDb as a <code>.tar.gz</code> file to anyone with the password.
+Make a note of the base32 address of the new site for the next step.</p>
+
+<h2 id="password-protected-retrieval-of-shared-netdb-content-over-i2p">Password-Protected Retrieval of Shared NetDB content over I2P</h2>
+
+<p>Run this command on a router hosting which <strong>is</strong> hosting a reseed server on the same IP address, or add the arguments to your existing command.
+To retrieve a remote NetDB bundle from a hidden service, run reseed tools with the following arguments:</p>
+
+<pre><code class="language-sh">reseed-tools reseed --share-peer $(thebase32addressyoumadeanoteofaboveintheotherstepnow.b32.i2p) --share-password $(use_a_strong_password) --netdb $(path_to_your_netdb)
+</code></pre>
+
+<p>Periodically, the remote <code>netdb.tar.gz</code> bundle will be fetched from the remote server and extracted to the <code>--netdb</code> directory.
+If the <code>--netdb</code> directory is not empty, local RI&rsquo;s are left intact and never overwritten, essentially combining the local and remote netDb.
+If the directory is empty, the remote netDb will be the only netDb used by the reseed server.</p>
+
+      </div>
+    </main>
+    
+    <footer class="page-footer">
+      <p>Generated on 2026-02-26 00:19:50 • <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a></p>
+    </footer>
+  </div>
+</body>
+</html>

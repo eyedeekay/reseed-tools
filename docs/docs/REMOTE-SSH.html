@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REMOTE SSH - eyedeekay/reseed-tools</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <nav class="nav-sidebar">
+    <div class="repo-info">
+      <h2>
+        <a href="../index.html">eyedeekay/reseed-tools</a>
+      </h2>
+      <div class="repo-meta">
+        📝 550 commits
+         • 📜 License
+      </div>
+    </div>
+    
+    <ul class="nav-links">
+      <li><a href="../index.html">Repository Overview</a></li>
+      
+      
+        <div class="nav-section-title">Documentation:</div>
+        
+          <li><a href="../docs/CHANGELOG.html" >CHANGELOG</a></li>
+        
+          <li><a href="../docs/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/REMOTE.html" >REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE.html" >REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE-SSH.html" class="active">REMOTE SSH</a></li>
+        
+          <li><a href="../docs/docs/SERVICES.html" >Service Integration</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/SERVICES.html" >Service Integration</a></li>
+        
+          <li><a href="../docs/docs/TLS.html" >TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/TLS.html" >TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+          <li><a href="../docs/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+      
+    </ul>
+    
+    <div class="nav-footer">
+      <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a>
+    </div>
+  </nav>
+  
+  <div class="main-content">
+    <header class="page-header">
+      <h1>REMOTE SSH - eyedeekay/reseed-tools</h1>
+    </header>
+    
+    <main>
+      <div class="doc-content">
+        <h1 id="using-a-remote-network-database-with-ssh">Using a remote Network Database with SSH</h1>
+
+<p>Beginning in <code>reseed-tools 2.5.0</code> it is possible to use reseed-tools to &ldquo;share&rdquo; a netDb directory on one host with a reseed server on another host.
+This feature is built into the reseed-tools software.
+It is also possible to do this manually using <code>sshfs</code>, <code>ssh</code> combined with <code>cron</code>, and most available backup utilities like <code>borg</code> and <code>syncthing</code>.
+This guide only covers <code>rsync+ssh</code> and <code>cron</code> where I2P is running as a user(not as <code>i2psvc</code>).
+It requires 2 hosts with exposed SSH ports that can reach eachother.
+It also pretty much assumes you&rsquo;re using something based on Debian.</p>
+
+<h2 id="why">Why?</h2>
+
+<p>In most setups, a reseed service is using a network database which is kept on the same server as the I2P router where it finds it&rsquo;s netDb.
+This is convenient, however if reseed servers are targeted for a RouterInfo spam attack, then the reseed server could potentially be overwhelmed with spammy routerInfos.
+That impairs a new user&rsquo;s ability to join the network and slows down network integration.</p>
+
+<h2 id="ssh-protected-retrieval-of-netdb-content-over-i2p">SSH-Protected Retrieval of NetDB content over I2P</h2>
+
+<p>In this guide, the NetDB is retrieved from a remote router by the reseed server.</p>
+
+<h3 id="on-the-remote-router">On the Remote Router</h3>
+
+<p>Install openssh-server and rsync and enable the service:</p>
+
+<pre><code class="language-sh">sudo apt install openssh-server rsync
+sudo systemctl enable ssh
+</code></pre>
+
+<h3 id="on-the-reseed-server">On the Reseed Server</h3>
+
+<p>Set up SSH and generate new keys, without passwords:</p>
+
+<pre><code class="language-sh">ssh-keygen -f ~/.ssh/netdb_sync_ed25519 -N &quot;&quot;
+</code></pre>
+
+<p>Then, copy the keys to the remote router:</p>
+
+<pre><code class="language-sh">ssh-copy-id -f ~/.ssh/netdb_sync_ed25519 $(UserRunningI2P)@$(RemoteRouter)
+</code></pre>
+
+<p>After, set up the <code>cron</code> job to copy the netDB.</p>
+
+<pre><code class="language-sh">crontab -e
+&gt;&gt;
+* 30 * * *  rsync --update -raz $(UserRunningI2P)@$(RemoteRouter):$(/Path/To/Remote/NetDB) $(Path/To/My/NetDB)
+</code></pre>
+
+<h2 id="ssh-protected-sharing-of-netdb-content-over-i2p">SSH-Protected Sharing of NetDB content over I2P</h2>
+
+<p>In this guide, the NetDB is pushed to a reseed server by a remote router.</p>
+
+<h3 id="on-the-reseed-server-1">On the Reseed Server</h3>
+
+<p>Install openssh-server and rsync and enable the service:</p>
+
+<pre><code class="language-sh">sudo apt install openssh-server rsync
+sudo systemctl enable ssh
+</code></pre>
+
+<p>Next, stop your reseed server.</p>
+
+<pre><code class="language-sh">killall reseed-tools
+</code></pre>
+
+<h3 id="on-the-remote-router-1">On the Remote Router</h3>
+
+<p>Start by setting up SSH and generating new keys, without passwords:</p>
+
+<pre><code class="language-sh">ssh-keygen -f ~/.ssh/netdb_sync_ed25519 -N &quot;&quot;
+</code></pre>
+
+<p>Then, copy the keys to the Reseed Server:</p>
+
+<pre><code class="language-sh">ssh-copy-id -f ~/.ssh/netdb_sync_ed25519 $(UserRunningReseed)@$(ReseedServer)
+</code></pre>
+
+<p>After, set up the <code>cron</code> job to copy the netDB.</p>
+
+<pre><code class="language-sh">crontab -e
+&gt;&gt;
+* 30 * * *  rsync --update -raz $(/Path/To/My/NetDB) $(UserRunningReseed)@$(ReseedServer):/$(Path/To/Reseed/NetDB)
+</code></pre>
+
+      </div>
+    </main>
+    
+    <footer class="page-footer">
+      <p>Generated on 2026-02-26 00:19:50 • <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a></p>
+    </footer>
+  </div>
+</body>
+</html>

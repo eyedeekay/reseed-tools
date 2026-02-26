@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TLS - eyedeekay/reseed-tools</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <nav class="nav-sidebar">
+    <div class="repo-info">
+      <h2>
+        <a href="../index.html">eyedeekay/reseed-tools</a>
+      </h2>
+      <div class="repo-meta">
+        📝 550 commits
+         • 📜 License
+      </div>
+    </div>
+    
+    <ul class="nav-links">
+      <li><a href="../index.html">Repository Overview</a></li>
+      
+      
+        <div class="nav-section-title">Documentation:</div>
+        
+          <li><a href="../docs/CHANGELOG.html" >CHANGELOG</a></li>
+        
+          <li><a href="../docs/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DEBIAN.html" >Debian and Ubuntu Packages</a></li>
+        
+          <li><a href="../docs/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/DOCKER.html" >Docker</a></li>
+        
+          <li><a href="../docs/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/EXAMPLES.html" >EXAMPLES</a></li>
+        
+          <li><a href="../docs/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/es/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/id/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/jp/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/ko/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ar/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/pr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/fr/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/de/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/bn/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/hi/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/reseed/content/lang/zh/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/en/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/content/lang/ru/homepage.html" >Homepage</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/docs/PROXY.html" >PROXY</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/docs/PLUGIN.html" >Plugin install URL's</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/REMOTE.html" >REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE.html" >REMOTE</a></li>
+        
+          <li><a href="../docs/docs/REMOTE-SSH.html" >REMOTE SSH</a></li>
+        
+          <li><a href="../docs/docs/SERVICES.html" >Service Integration</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/SERVICES.html" >Service Integration</a></li>
+        
+          <li><a href="../docs/docs/TLS.html" >TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/TLS.html" class="active">TLS</a></li>
+        
+          <li><a href="../docs/doc-pak/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+          <li><a href="../docs/docs/UPGRADE.html" >UPGRADE</a></li>
+        
+      
+    </ul>
+    
+    <div class="nav-footer">
+      <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a>
+    </div>
+  </nav>
+  
+  <div class="main-content">
+    <header class="page-header">
+      <h1>TLS - eyedeekay/reseed-tools</h1>
+    </header>
+    
+    <main>
+      <div class="doc-content">
+        <h1 id="tls-configuration-for-your-reseed-server">TLS Configuration for your Reseed Server</h1>
+
+<p>By default, <code>reseed-tools</code> will generate self-signed certificates for your reseed service.
+This is so that it can use TLS by default, and so that it can offer self-signed certificates when operating in <code>.onion</code> mode.
+It is also possible to configure <code>reseed-tools</code> without TLS certificates,
+or to configure it to use ACME in order to automtically obtain a certificate from Let&rsquo;s Encrypt.</p>
+
+<p>I2P does not rely on TLS Certificate Authorities to authenticate reseed servers.
+Instead, the certificates are effectively &ldquo;Pinned&rdquo; in the software, after manual review by the I2P developers and the community.
+It is acceptable to use self-signed certificates in this fashion because they are not summarily trusted.
+A self-signed certificate which is not configured in the I2P software will not work when serving a reseed to an I2P router.</p>
+
+<h2 id="disable-tls">Disable TLS</h2>
+
+<p>If you do this, it is highly recommended that you use a reverse proxy such as <code>Apache2</code> or <code>nginx</code> to provide a TLS connection to clients.
+Alternatively, you could run <code>reseed-tools</code> as an <code>.onion</code> service and rely on Tor for encryption and authentication.</p>
+
+<p>You can disable automatic TLS configuration with the <code>--trustProxy</code> flag like this:</p>
+
+<pre><code class="language-sh">
+./reseed-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --trustProxy --ip=127.0.0.1
+</code></pre>
+
+<h2 id="setup-self-signed-tls-non-interactively">Setup Self-Signed TLS non-interactively</h2>
+
+<p>If you don&rsquo;t want to interactively configure TLS but still want to use self-signed certificates, you can pass the <code>--yes</code> flag, which will use the defaults for all config values.</p>
+
+<pre><code class="language-sh">
+./reseed-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --yes
+</code></pre>
+
+<h2 id="use-acme-to-acquire-tls-certificate">Use ACME to acquire TLS certificate</h2>
+
+<p>Instead of self-signed certificates, if you want to chain up to a TLS CA, you can.
+To automate this process using an ACME CA, like Let&rsquo;s Encrypt, you can use the <code>--acme</code> flag.
+Be sure to change the <code>--acmeserver</code> option in order to use a <strong>production</strong> ACME server, as
+the software defaults to a <strong>staging</strong> ACME server for testing purposes.</p>
+
+<p>This functionality is new and may have issues. Please file bug reports at <a href="https://i2pgit.org/go-i2p/reseed-tools" target="_blank">i2pgit</a> or <a href="https://github.com/go-i2p/reseed-tools" target="_blank">github</a>.</p>
+
+<pre><code class="language-sh">
+./reseed-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --acme --acmeserver=&quot;https://acme-v02.api.letsencrypt.org/directory&quot;
+</code></pre>
+
+      </div>
+    </main>
+    
+    <footer class="page-footer">
+      <p>Generated on 2026-02-26 00:19:50 • <a href="https://github.com/eyedeekay/reseed-tools" target="_blank">View on GitHub</a></p>
+    </footer>
+  </div>
+</body>
+</html>
