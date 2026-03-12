@@ -1,0 +1,25 @@
+#include <tunables/global>
+
+profile reseed-tools /usr{,/local}/bin/reseed-tools {
+  #include <abstractions/base>
+
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+
+  # Allow reading key and certs
+  /usr{,/local}/share/reseed-tools/      r,
+  /usr{,/local}/share/reseed-tools/*.pem r,
+  /usr{,/local}/share/reseed-tools/*.crt r,
+
+  # Default debian location for i2pd
+  /var/lib/i2pd/netDb/   r,
+  /var/lib/i2pd/netDb/** r,
+
+  # Default debian location for i2p
+  /var/lib/i2p/i2p-config/netDb/   r,
+  /var/lib/i2p/i2p-config/netDb/** r,
+
+  #include if exists <local/usr.bin.reseed-tools>
+}
+
